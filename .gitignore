@@ -1,0 +1,13 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.db
+*.log
+*.nupkg
+TestResults/
+.DS_Store
+
+# Prompt files
+INITIAL_TEMPLATE_PROMPT.md

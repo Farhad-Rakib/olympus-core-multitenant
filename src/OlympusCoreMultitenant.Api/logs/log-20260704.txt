@@ -1,0 +1,112 @@
+2026-07-04 20:46:48.262 +06:00 [DBG] Starting database bootstrapper...
+2026-07-04 20:46:48.370 +06:00 [DBG] Attempting database connection and migration...
+2026-07-04 20:46:49.503 +06:00 [DBG] Database migration applied successfully.
+2026-07-04 20:46:49.675 +06:00 [DBG] Provisioning default tenant...
+2026-07-04 20:52:34.254 +06:00 [DBG] Starting database bootstrapper...
+2026-07-04 20:52:34.389 +06:00 [DBG] Attempting database connection and migration...
+2026-07-04 20:52:35.079 +06:00 [DBG] Database migration applied successfully.
+2026-07-04 20:52:35.243 +06:00 [DBG] Provisioning default tenant...
+2026-07-04 20:52:36.577 +06:00 [INF] RBAC seed completed successfully.
+2026-07-04 20:52:37.184 +06:00 [DBG] Default tenant provisioning complete.
+2026-07-04 20:52:37.185 +06:00 [DBG] Database bootstrapper finished.
+2026-07-04 20:52:37.441 +06:00 [DBG] Menu permission validation passed.
+2026-07-04 20:52:37.521 +06:00 [DBG] Permissions already in sync
+2026-07-04 20:52:37.581 +06:00 [WRN] Could not reach Seq at http://localhost:5341
+System.Net.Http.HttpRequestException: Connection refused (localhost:5341)
+ ---> System.Net.Sockets.SocketException (61): Connection refused
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Net.Sockets.Socket.<ConnectAsync>g__WaitForConnectWithCancellation|285_0(AwaitableSocketAsyncEventArgs saea, ValueTask connectTask, CancellationToken cancellationToken)
+   at System.Net.Http.HttpConnectionPool.ConnectToTcpHostAsync(String host, Int32 port, HttpRequestMessage initialRequest, Boolean async, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at System.Net.Http.HttpConnectionPool.ConnectToTcpHostAsync(String host, Int32 port, HttpRequestMessage initialRequest, Boolean async, CancellationToken cancellationToken)
+   at System.Net.Http.HttpConnectionPool.ConnectAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+   at System.Net.Http.HttpConnectionPool.CreateHttp11ConnectionAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+   at System.Net.Http.HttpConnectionPool.AddHttp11ConnectionAsync(QueueItem queueItem)
+   at System.Threading.Tasks.TaskCompletionSourceWithCancellation`1.WaitWithCancellationAsync(CancellationToken cancellationToken)
+   at System.Net.Http.HttpConnectionPool.SendWithVersionDetectionAndRetryAsync(HttpRequestMessage request, Boolean async, Boolean doRequestAuth, CancellationToken cancellationToken)
+   at System.Net.Http.RedirectHandler.SendAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+   at System.Net.Http.HttpClient.<SendAsync>g__Core|83_0(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationTokenSource cts, Boolean disposeCts, CancellationTokenSource pendingRequestsCts, CancellationToken originalCancellationToken)
+   at Program.<Main>$(String[] args) in /Users/farhadrakib/Personal Projects/olympus-core-multitenant/src/OlympusCoreMultitenant.Api/Program.cs:line 276
+2026-07-04 20:52:37.586 +06:00 [DBG] App is running on: default Kestrel port
+2026-07-04 20:52:50.513 +06:00 [INF] HTTP OPTIONS /api/v1/Menu/all responded 204 in 51.9927 ms
+2026-07-04 20:52:50.513 +06:00 [INF] HTTP OPTIONS /api/v1/Dashboard responded 204 in 52.2845 ms
+2026-07-04 20:52:50.517 +06:00 [INF] HTTP OPTIONS /api/v1/Users/me responded 204 in 56.9476 ms
+2026-07-04 20:52:50.517 +06:00 [INF] HTTP OPTIONS /api/v1/SiteSettings/palette/sidebar responded 204 in 56.9346 ms
+2026-07-04 20:52:50.517 +06:00 [INF] HTTP OPTIONS /api/v1/SiteSettings responded 204 in 56.9377 ms
+2026-07-04 20:52:50.575 +06:00 [INF] HTTP GET /api/v1/Dashboard responded 404 in 55.2894 ms
+2026-07-04 20:52:50.575 +06:00 [INF] HTTP GET /api/v1/Menu/all responded 404 in 55.3060 ms
+2026-07-04 20:52:50.586 +06:00 [INF] HTTP GET /api/v1/SiteSettings/palette/sidebar responded 400 in 66.4308 ms
+2026-07-04 20:52:50.586 +06:00 [INF] HTTP GET /api/v1/Users/me responded 400 in 66.5325 ms
+2026-07-04 20:52:50.586 +06:00 [INF] HTTP GET /api/v1/SiteSettings responded 400 in 66.4040 ms
+2026-07-04 20:52:51.713 +06:00 [INF] HTTP GET /api/v1/Menu/all responded 404 in 76.3699 ms
+2026-07-04 20:52:51.713 +06:00 [INF] HTTP GET /api/v1/SiteSettings responded 400 in 6.6611 ms
+2026-07-04 20:52:51.713 +06:00 [INF] HTTP GET /api/v1/SiteSettings/palette/sidebar responded 400 in 76.1685 ms
+2026-07-04 20:52:51.713 +06:00 [INF] HTTP GET /api/v1/Users/me responded 400 in 76.2033 ms
+2026-07-04 20:52:53.828 +06:00 [INF] HTTP GET /api/v1/SiteSettings/palette/sidebar responded 400 in 100.9516 ms
+2026-07-04 20:52:53.828 +06:00 [INF] HTTP GET /api/v1/SiteSettings responded 400 in 77.6563 ms
+2026-07-04 20:53:13.443 +06:00 [INF] HTTP OPTIONS /api/v1/Dashboard responded 204 in 0.0601 ms
+2026-07-04 20:53:13.443 +06:00 [INF] HTTP OPTIONS /api/v1/Menu/all responded 204 in 0.1004 ms
+2026-07-04 20:53:13.465 +06:00 [INF] HTTP OPTIONS /api/v1/SiteSettings responded 204 in 21.2360 ms
+2026-07-04 20:53:13.465 +06:00 [INF] HTTP OPTIONS /api/v1/Users/me responded 204 in 21.6548 ms
+2026-07-04 20:53:13.565 +06:00 [INF] HTTP OPTIONS /api/v1/SiteSettings/palette/sidebar responded 204 in 74.1568 ms
+2026-07-04 20:53:13.567 +06:00 [INF] HTTP GET /api/v1/Menu/all responded 404 in 1.3855 ms
+2026-07-04 20:53:13.567 +06:00 [INF] HTTP GET /api/v1/Dashboard responded 404 in 1.3884 ms
+2026-07-04 20:53:13.568 +06:00 [INF] HTTP GET /api/v1/Users/me responded 400 in 1.3978 ms
+2026-07-04 20:53:13.568 +06:00 [INF] HTTP GET /api/v1/SiteSettings responded 400 in 1.4101 ms
+2026-07-04 20:53:13.568 +06:00 [INF] HTTP GET /api/v1/SiteSettings/palette/sidebar responded 400 in 1.2944 ms
+2026-07-04 20:53:14.649 +06:00 [INF] HTTP OPTIONS /api/v1/Menu/all responded 204 in 46.6240 ms
+2026-07-04 20:53:14.650 +06:00 [INF] HTTP OPTIONS /api/v1/SiteSettings/palette/sidebar responded 204 in 0.1876 ms
+2026-07-04 20:53:14.650 +06:00 [INF] HTTP OPTIONS /api/v1/SiteSettings responded 204 in 1.1191 ms
+2026-07-04 20:53:14.650 +06:00 [INF] HTTP OPTIONS /api/v1/Users/me responded 204 in 0.1095 ms
+2026-07-04 20:53:14.783 +06:00 [INF] HTTP GET /api/v1/Menu/all responded 404 in 101.6271 ms
+2026-07-04 20:53:14.784 +06:00 [INF] HTTP GET /api/v1/Users/me responded 400 in 52.0393 ms
+2026-07-04 20:53:14.783 +06:00 [INF] HTTP GET /api/v1/SiteSettings responded 400 in 51.8523 ms
+2026-07-04 20:53:14.783 +06:00 [INF] HTTP GET /api/v1/SiteSettings/palette/sidebar responded 400 in 77.0910 ms
+2026-07-04 20:53:16.820 +06:00 [INF] HTTP OPTIONS /api/v1/SiteSettings/palette/sidebar responded 204 in 21.1918 ms
+2026-07-04 20:53:16.871 +06:00 [INF] HTTP OPTIONS /api/v1/SiteSettings responded 204 in 51.1215 ms
+2026-07-04 20:53:16.928 +06:00 [INF] HTTP GET /api/v1/SiteSettings/palette/sidebar responded 400 in 45.0483 ms
+2026-07-04 20:53:16.928 +06:00 [INF] HTTP GET /api/v1/SiteSettings responded 400 in 45.0600 ms
+2026-07-04 20:57:48.011 +06:00 [INF] HTTP GET /api/v1/SiteSettings responded 400 in 121.8506 ms
+2026-07-04 21:05:09.290 +06:00 [DBG] Starting database bootstrapper...
+2026-07-04 21:05:09.408 +06:00 [DBG] Attempting database connection and migration...
+2026-07-04 21:05:10.123 +06:00 [DBG] Database migration applied successfully.
+2026-07-04 21:05:10.288 +06:00 [DBG] Provisioning default tenant...
+2026-07-04 21:05:11.271 +06:00 [INF] RBAC seed completed successfully.
+2026-07-04 21:05:11.838 +06:00 [DBG] Default tenant provisioning complete.
+2026-07-04 21:05:11.839 +06:00 [DBG] Database bootstrapper finished.
+2026-07-04 21:05:12.024 +06:00 [DBG] Menu permission validation passed.
+2026-07-04 21:05:12.056 +06:00 [DBG] Permissions already in sync
+2026-07-04 21:05:12.095 +06:00 [WRN] Could not reach Seq at http://localhost:5341
+System.Net.Http.HttpRequestException: Connection refused (localhost:5341)
+ ---> System.Net.Sockets.SocketException (61): Connection refused
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Net.Sockets.Socket.<ConnectAsync>g__WaitForConnectWithCancellation|285_0(AwaitableSocketAsyncEventArgs saea, ValueTask connectTask, CancellationToken cancellationToken)
+   at System.Net.Http.HttpConnectionPool.ConnectToTcpHostAsync(String host, Int32 port, HttpRequestMessage initialRequest, Boolean async, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at System.Net.Http.HttpConnectionPool.ConnectToTcpHostAsync(String host, Int32 port, HttpRequestMessage initialRequest, Boolean async, CancellationToken cancellationToken)
+   at System.Net.Http.HttpConnectionPool.ConnectAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+   at System.Net.Http.HttpConnectionPool.CreateHttp11ConnectionAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+   at System.Net.Http.HttpConnectionPool.AddHttp11ConnectionAsync(QueueItem queueItem)
+   at System.Threading.Tasks.TaskCompletionSourceWithCancellation`1.WaitWithCancellationAsync(CancellationToken cancellationToken)
+   at System.Net.Http.HttpConnectionPool.SendWithVersionDetectionAndRetryAsync(HttpRequestMessage request, Boolean async, Boolean doRequestAuth, CancellationToken cancellationToken)
+   at System.Net.Http.RedirectHandler.SendAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+   at System.Net.Http.HttpClient.<SendAsync>g__Core|83_0(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationTokenSource cts, Boolean disposeCts, CancellationTokenSource pendingRequestsCts, CancellationToken originalCancellationToken)
+   at Program.<Main>$(String[] args) in /Users/farhadrakib/Personal Projects/olympus-core-multitenant/src/OlympusCoreMultitenant.Api/Program.cs:line 276
+2026-07-04 21:05:12.100 +06:00 [DBG] App is running on: default Kestrel port
+2026-07-04 21:06:21.321 +06:00 [INF] HTTP OPTIONS /api/v1/Dashboard responded 204 in 105.3693 ms
+2026-07-04 21:06:21.321 +06:00 [INF] HTTP OPTIONS /api/v1/Menu/all responded 204 in 105.3728 ms
+2026-07-04 21:06:21.371 +06:00 [INF] HTTP OPTIONS /api/v1/Users/me responded 204 in 155.8063 ms
+2026-07-04 21:06:21.371 +06:00 [INF] HTTP OPTIONS /api/v1/SiteSettings responded 204 in 155.8085 ms
+2026-07-04 21:06:21.371 +06:00 [INF] HTTP OPTIONS /api/v1/SiteSettings/palette/sidebar responded 204 in 155.8043 ms
+2026-07-04 21:06:21.431 +06:00 [INF] HTTP GET /api/v1/Menu/all responded 404 in 55.7112 ms
+2026-07-04 21:06:21.431 +06:00 [INF] HTTP GET /api/v1/Dashboard responded 404 in 56.2643 ms
+2026-07-04 21:06:21.442 +06:00 [INF] HTTP GET /api/v1/SiteSettings/palette/sidebar responded 400 in 67.1638 ms
+2026-07-04 21:06:21.442 +06:00 [INF] HTTP GET /api/v1/SiteSettings responded 400 in 67.1868 ms
+2026-07-04 21:06:21.442 +06:00 [INF] HTTP GET /api/v1/Users/me responded 400 in 66.7081 ms
+2026-07-04 21:06:22.498 +06:00 [INF] HTTP GET /api/v1/Menu/all responded 404 in 30.0701 ms
+2026-07-04 21:06:22.594 +06:00 [INF] HTTP GET /api/v1/SiteSettings/palette/sidebar responded 400 in 72.0837 ms
+2026-07-04 21:06:22.594 +06:00 [INF] HTTP GET /api/v1/Users/me responded 400 in 72.0423 ms
+2026-07-04 21:06:22.594 +06:00 [INF] HTTP GET /api/v1/SiteSettings responded 400 in 72.0154 ms
+2026-07-04 21:06:24.135 +06:00 [INF] HTTP GET /api/v1/SiteSettings responded 400 in 48.4726 ms

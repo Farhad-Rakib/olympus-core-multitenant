@@ -1,0 +1,282 @@
+# GitLab CI/CD Pipeline for OlympusCoreMultitenant
+# Supports: Development, Staging, Production
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+  REGISTRY: "registry.gitlab.com"
+  PROJECT_NAME: "projectname"
+  # Base image configuration
+  BASE_IMAGE_REGISTRY: "mcr.microsoft.com"
+  DOTNET_SDK_VERSION: "8.0"
+  DOTNET_ASPNET_VERSION: "8.0"
+
+stages:
+  - build
+  - test
+  - deploy-dev
+  - deploy-staging
+  - deploy-production
+
+# ===========================
+# BUILD STAGE
+# ===========================
+build:
+  stage: build
+  image: ${BASE_IMAGE_REGISTRY}/dotnet/sdk:${DOTNET_SDK_VERSION}
+  variables:
+    BUILD_CONFIGURATION: "Release"
+  script:
+    - echo "Building OlympusCoreMultitenant..."
+    - cd OlympusCoreMultitenant.Api
+    - dotnet build -c ${BUILD_CONFIGURATION}
+    - dotnet publish -c ${BUILD_CONFIGURATION} -o ../publish
+  artifacts:
+    paths:
+      - publish/
+    expire_in: 1 hour
+  only:
+    - dev
+    - stage
+    - main
+    - merge_requests
+  cache:
+    paths:
+      - .nuget/
+
+# ===========================
+# TEST STAGE
+# ===========================
+test:
+  stage: test
+  image: ${BASE_IMAGE_REGISTRY}/dotnet/sdk:${DOTNET_SDK_VERSION}
+  variables:
+    BUILD_CONFIGURATION: "Debug"
+  script:
+    - echo "Running tests..."
+    - dotnet test -c ${BUILD_CONFIGURATION} --logger trx --results-directory ./test-results
+  artifacts:
+    when: always
+    paths:
+      - test-results/
+    reports:
+      junit: test-results/*.trx
+  only:
+    - dev
+    - stage
+    - main
+    - merge_requests
+  cache:
+    paths:
+      - .nuget/
+
+# ===========================
+# DOCKER BUILD & PUSH JOBS
+# ===========================
+
+# Build and push Docker image for Development
+.docker_build_template: &docker_build_template
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $REGISTRY
+    - export IMAGE_TAG="${REGISTRY}/${CI_PROJECT_NAMESPACE}/${PROJECT_NAME}:${CI_ENVIRONMENT_NAME}-${CI_COMMIT_SHA:0:8}"
+    - export IMAGE_LATEST="${REGISTRY}/${CI_PROJECT_NAMESPACE}/${PROJECT_NAME}:${CI_ENVIRONMENT_NAME}-latest"
+  script:
+    - echo "Building Docker image for ${CI_ENVIRONMENT_NAME}..."
+    - docker build -f Dockerfile 
+        --build-arg DOTNET_SDK_VERSION=${DOTNET_SDK_VERSION}
+        --build-arg DOTNET_ASPNET_VERSION=${DOTNET_ASPNET_VERSION}
+        -t ${IMAGE_TAG}
+        -t ${IMAGE_LATEST}
+        .
+    - echo "Pushing Docker image..."
+    - docker push ${IMAGE_TAG}
+    - docker push ${IMAGE_LATEST}
+  after_script:
+    - docker logout $REGISTRY
+
+# Development - Build and Push
+docker:build:dev:
+  <<: *docker_build_template
+  environment:
+    name: development
+  only:
+    - dev
+
+# Staging - Build and Push
+docker:build:staging:
+  <<: *docker_build_template
+  environment:
+    name: staging
+  only:
+    - stage
+
+# Production - Build and Push
+docker:build:production:
+  <<: *docker_build_template
+  environment:
+    name: production
+  only:
+    - main
+
+# ===========================
+# DEPLOYMENT STAGE - DEVELOPMENT
+# ===========================
+deploy:dev:
+  stage: deploy-dev
+  image: docker:latest
+  environment:
+    name: development
+    url: https://dev-api.yourproject.local
+  variables:
+    ENVIRONMENT_NAME: "Development"
+    ASPNETCORE_ENVIRONMENT: "Development"
+    DOCKER_IMAGE: "${REGISTRY}/${CI_PROJECT_NAMESPACE}/${PROJECT_NAME}:development-${CI_COMMIT_SHA:0:8}"
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $REGISTRY
+  script:
+    - echo "Deploying to Development environment..."
+    - |
+      docker run -d \
+        --name olympuscoremultitenant-dev \
+        --restart unless-stopped \
+        -p 5001:5001 \
+        -e ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT} \
+        -e ConnectionStrings__PostgresConnection=${DEV_DB_CONNECTION_STRING} \
+        -e Jwt__SecretKey=${DEV_JWT_SECRET_KEY} \
+        -e Jwt__Issuer=${DEV_JWT_ISSUER} \
+        -e Jwt__Audience=${DEV_JWT_AUDIENCE} \
+        -e Smtp__Host=${DEV_SMTP_HOST} \
+        -e Smtp__Port=${DEV_SMTP_PORT} \
+        -e Smtp__Username=${DEV_SMTP_USERNAME} \
+        -e Smtp__Password=${DEV_SMTP_PASSWORD} \
+        -e Smtp__FromAddress=${DEV_SMTP_FROM_ADDRESS} \
+        ${DOCKER_IMAGE}
+    - echo "Development deployment completed successfully"
+  after_script:
+    - docker logout $REGISTRY
+  only:
+    - dev
+  when: manual
+
+# ===========================
+# DEPLOYMENT STAGE - STAGING
+# ===========================
+deploy:staging:
+  stage: deploy-staging
+  image: docker:latest
+  environment:
+    name: staging
+    url: https://staging-api.yourproject.local
+  variables:
+    ENVIRONMENT_NAME: "Staging"
+    ASPNETCORE_ENVIRONMENT: "Staging"
+    DOCKER_IMAGE: "${REGISTRY}/${CI_PROJECT_NAMESPACE}/${PROJECT_NAME}:staging-${CI_COMMIT_SHA:0:8}"
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $REGISTRY
+  script:
+    - echo "Deploying to Staging environment..."
+    - |
+      docker run -d \
+        --name olympuscoremultitenant-staging \
+        --restart unless-stopped \
+        -p 5001:5001 \
+        -e ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT} \
+        -e ConnectionStrings__PostgresConnection=${STAGING_DB_CONNECTION_STRING} \
+        -e Jwt__SecretKey=${STAGING_JWT_SECRET_KEY} \
+        -e Jwt__Issuer=${STAGING_JWT_ISSUER} \
+        -e Jwt__Audience=${STAGING_JWT_AUDIENCE} \
+        -e Smtp__Host=${STAGING_SMTP_HOST} \
+        -e Smtp__Port=${STAGING_SMTP_PORT} \
+        -e Smtp__Username=${STAGING_SMTP_USERNAME} \
+        -e Smtp__Password=${STAGING_SMTP_PASSWORD} \
+        -e Smtp__FromAddress=${STAGING_SMTP_FROM_ADDRESS} \
+        ${DOCKER_IMAGE}
+    - echo "Staging deployment completed successfully"
+  after_script:
+    - docker logout $REGISTRY
+  only:
+    - stage
+  when: manual
+
+# ===========================
+# DEPLOYMENT STAGE - PRODUCTION
+# ===========================
+deploy:production:
+  stage: deploy-production
+  image: docker:latest
+  environment:
+    name: production
+    url: https://api.yourproject.local
+  variables:
+    ENVIRONMENT_NAME: "Production"
+    ASPNETCORE_ENVIRONMENT: "Production"
+    DOCKER_IMAGE: "${REGISTRY}/${CI_PROJECT_NAMESPACE}/${PROJECT_NAME}:production-${CI_COMMIT_SHA:0:8}"
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $REGISTRY
+  script:
+    - echo "Deploying to Production environment..."
+    - |
+      docker run -d \
+        --name olympuscoremultitenant-prod \
+        --restart unless-stopped \
+        -p 5001:5001 \
+        -e ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT} \
+        -e ConnectionStrings__PostgresConnection=${PROD_DB_CONNECTION_STRING} \
+        -e Jwt__SecretKey=${PROD_JWT_SECRET_KEY} \
+        -e Jwt__Issuer=${PROD_JWT_ISSUER} \
+        -e Jwt__Audience=${PROD_JWT_AUDIENCE} \
+        -e Smtp__Host=${PROD_SMTP_HOST} \
+        -e Smtp__Port=${PROD_SMTP_PORT} \
+        -e Smtp__Username=${PROD_SMTP_USERNAME} \
+        -e Smtp__Password=${PROD_SMTP_PASSWORD} \
+        -e Smtp__FromAddress=${PROD_SMTP_FROM_ADDRESS} \
+        ${DOCKER_IMAGE}
+    - echo "Production deployment completed successfully"
+  after_script:
+    - docker logout $REGISTRY
+  only:
+    - main
+  when: manual
+
+# ===========================
+# CLEANUP JOBS (Optional)
+# ===========================
+cleanup:registry:dev:
+  stage: deploy-dev
+  image: docker:latest
+  variables:
+    CLEANUP_DAYS: "30"
+  script:
+    - echo "Cleaning up old Dev Docker images..."
+    # Add cleanup logic here
+  only:
+    - dev
+  when: manual
+
+cleanup:registry:staging:
+  stage: deploy-staging
+  image: docker:latest
+  variables:
+    CLEANUP_DAYS: "30"
+  script:
+    - echo "Cleaning up old Staging Docker images..."
+    # Add cleanup logic here
+  only:
+    - stage
+  when: manual
+
+cleanup:registry:production:
+  stage: deploy-production
+  image: docker:latest
+  variables:
+    CLEANUP_DAYS: "30"
+  script:
+    - echo "Cleaning up old Production Docker images..."
+    # Add cleanup logic here
+  only:
+    - main
+  when: manual

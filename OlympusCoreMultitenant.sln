@@ -1,0 +1,46 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34309.116
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OlympusCoreMultitenant.Api", "src/OlympusCoreMultitenant.Api/OlympusCoreMultitenant.Api.csproj", "{B08A7C54-45A8-4254-A2E7-948E57843B26}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OlympusCoreMultitenant.Application", "src/OlympusCoreMultitenant.Application/OlympusCoreMultitenant.Application.csproj", "{5B6B8A38-09A8-4BEC-BC75-A2870AE05C75}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OlympusCoreMultitenant.Domain", "src/OlympusCoreMultitenant.Domain/OlympusCoreMultitenant.Domain.csproj", "{9C323312-398B-45C0-8B41-DBF57E816B69}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OlympusCoreMultitenant.Infrastructure", "src/OlympusCoreMultitenant.Infrastructure/OlympusCoreMultitenant.Infrastructure.csproj", "{A8318924-E1D7-4722-BAB6-23C14121115A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OlympusCoreMultitenant.Persistence", "src/OlympusCoreMultitenant.Persistence/OlympusCoreMultitenant.Persistence.csproj", "{F99AD19A-E2F9-4AD3-93D5-E0E9698C073B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B08A7C54-45A8-4254-A2E7-948E57843B26}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B08A7C54-45A8-4254-A2E7-948E57843B26}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B08A7C54-45A8-4254-A2E7-948E57843B26}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B08A7C54-45A8-4254-A2E7-948E57843B26}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5B6B8A38-09A8-4BEC-BC75-A2870AE05C75}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5B6B8A38-09A8-4BEC-BC75-A2870AE05C75}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5B6B8A38-09A8-4BEC-BC75-A2870AE05C75}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5B6B8A38-09A8-4BEC-BC75-A2870AE05C75}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9C323312-398B-45C0-8B41-DBF57E816B69}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9C323312-398B-45C0-8B41-DBF57E816B69}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9C323312-398B-45C0-8B41-DBF57E816B69}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9C323312-398B-45C0-8B41-DBF57E816B69}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A8318924-E1D7-4722-BAB6-23C14121115A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A8318924-E1D7-4722-BAB6-23C14121115A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A8318924-E1D7-4722-BAB6-23C14121115A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A8318924-E1D7-4722-BAB6-23C14121115A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F99AD19A-E2F9-4AD3-93D5-E0E9698C073B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F99AD19A-E2F9-4AD3-93D5-E0E9698C073B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F99AD19A-E2F9-4AD3-93D5-E0E9698C073B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F99AD19A-E2F9-4AD3-93D5-E0E9698C073B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
