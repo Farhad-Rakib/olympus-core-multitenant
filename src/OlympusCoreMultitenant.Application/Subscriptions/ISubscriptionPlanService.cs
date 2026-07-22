@@ -9,4 +9,5 @@ public interface ISubscriptionPlanService
     Task<SubscriptionPlanDto> CreateAsync(CreateSubscriptionPlanRequestDto request, CancellationToken cancellationToken = default);
     Task<SubscriptionPlanDto> UpdateAsync(long id, UpdateSubscriptionPlanRequestDto request, CancellationToken cancellationToken = default);
     Task DeleteAsync(long id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ModuleSummaryDto>> GetAvailableModulesAsync(CancellationToken cancellationToken = default);
 }

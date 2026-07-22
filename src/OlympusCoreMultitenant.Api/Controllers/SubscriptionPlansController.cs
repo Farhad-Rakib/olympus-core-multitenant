@@ -29,6 +29,14 @@ public sealed class SubscriptionPlansController : ControllerBase
         return Ok(ApiResponse<IReadOnlyList<SubscriptionPlanDto>>.SuccessResponse(plans, "Subscription plans retrieved successfully"));
     }
 
+    [HttpGet("available-modules")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ModuleSummaryDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAvailableModules(CancellationToken cancellationToken)
+    {
+        var modules = await _subscriptionPlanService.GetAvailableModulesAsync(cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<ModuleSummaryDto>>.SuccessResponse(modules, "Available modules retrieved successfully"));
+    }
+
     [HttpGet("{id:long}")]
     [ProducesResponseType(typeof(ApiResponse<SubscriptionPlanDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]

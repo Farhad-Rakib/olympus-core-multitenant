@@ -122,6 +122,16 @@ public sealed class SubscriptionPlanService : ISubscriptionPlanService
             .ToList();
     }
 
+    public async Task<IReadOnlyList<ModuleSummaryDto>> GetAvailableModulesAsync(CancellationToken cancellationToken = default)
+    {
+        var modules = await _moduleRepository.GetAllAsync(cancellationToken);
+        return modules
+            .Where(module => module.Kind != ModuleKind.System)
+            .OrderBy(module => module.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(module => new ModuleSummaryDto(module.Id, module.Key, module.Name, module.Description))
+            .ToList();
+    }
+
     private static SubscriptionPlanDto MapPlan(SubscriptionPlan plan, IReadOnlyList<long> moduleIds, IReadOnlyDictionary<long, string> moduleKeysById) =>
         new(
             plan.Id,
