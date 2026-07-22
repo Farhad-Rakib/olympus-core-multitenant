@@ -45,6 +45,13 @@ public sealed class UserRepository : BaseRepository<User>, IUserRepository
             .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
     }
 
+    public async Task<int> CountByTenantAsync(CancellationToken cancellationToken = default)
+    {
+        return await DbContext.Users
+            .Where(u => u.TenantId == DbContext.CurrentTenantId)
+            .CountAsync(cancellationToken);
+    }
+
     public override async Task<IReadOnlyList<User>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await DbContext.Users

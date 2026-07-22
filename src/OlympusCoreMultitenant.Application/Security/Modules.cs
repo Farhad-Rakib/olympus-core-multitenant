@@ -68,6 +68,7 @@ public static class Modules
         [Permissions.SystemCacheRead] = Platform,
         [Permissions.SystemCacheFlush] = Platform,
         [Permissions.TenantsManage] = Platform,
-        [Permissions.SystemSettingsManage] = Platform
+        [Permissions.SystemSettingsManage] = Platform,
+        [Permissions.SubscriptionPlansManage] = Platform
     };
 }

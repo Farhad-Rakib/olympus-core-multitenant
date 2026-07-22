@@ -32,6 +32,8 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Module> Modules => Set<Module>();
     public DbSet<TenantModule> TenantModules => Set<TenantModule>();
+    public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
+    public DbSet<SubscriptionPlanModule> SubscriptionPlanModules => Set<SubscriptionPlanModule>();
 
     // Referenced as `this.CurrentTenantId` inside the query filter lambdas built in SetTenantFilter.
     // EF Core's model is cached across DbContext instances (OnModelCreating runs once per app

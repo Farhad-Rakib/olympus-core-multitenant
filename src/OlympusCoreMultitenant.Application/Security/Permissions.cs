@@ -36,6 +36,7 @@ public static class Permissions
     public const string SiteSettingsDelete = "site-settings.delete";
     public const string TenantsManage = "tenants.manage";
     public const string SystemSettingsManage = "system-settings.manage";
+    public const string SubscriptionPlansManage = "subscription-plans.manage";
 
     public static readonly string[] All =
     [
@@ -72,6 +73,7 @@ public static class Permissions
         SystemCacheRead,
         SystemCacheFlush,
         TenantsManage,
-        SystemSettingsManage
+        SystemSettingsManage,
+        SubscriptionPlansManage
     ];
 }

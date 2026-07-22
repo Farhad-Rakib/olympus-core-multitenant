@@ -5,6 +5,7 @@ using OlympusCoreMultitenant.Application.Menu;
 using OlympusCoreMultitenant.Application.Permissions;
 using OlympusCoreMultitenant.Application.Roles;
 using OlympusCoreMultitenant.Application.SiteSettings;
+using OlympusCoreMultitenant.Application.Subscriptions;
 using OlympusCoreMultitenant.Application.SystemSettings;
 using OlympusCoreMultitenant.Application.Tenants;
 using OlympusCoreMultitenant.Application.Users;
@@ -23,6 +24,7 @@ public static class DependencyInjection
         services.AddScoped<ISystemSettingService, SystemSettingService>();
         services.AddScoped<IMenuService, MenuService>();
         services.AddScoped<ITenantService, TenantService>();
+        services.AddScoped<ISubscriptionPlanService, SubscriptionPlanService>();
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
 
         return services;

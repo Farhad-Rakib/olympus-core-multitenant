@@ -28,6 +28,7 @@ public sealed class AuthService : IAuthService
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentTenantService _currentTenantService;
     private readonly ISystemSettingRepository _systemSettingRepository;
+    private readonly ISubscriptionPlanRepository _subscriptionPlanRepository;
     private readonly AuthOptions _authOptions;
 
     public AuthService(
@@ -45,6 +46,7 @@ public sealed class AuthService : IAuthService
         IUnitOfWork unitOfWork,
         ICurrentTenantService currentTenantService,
         ISystemSettingRepository systemSettingRepository,
+        ISubscriptionPlanRepository subscriptionPlanRepository,
         IOptions<AuthOptions> authOptions)
     {
         _userRepository = userRepository;
@@ -61,6 +63,7 @@ public sealed class AuthService : IAuthService
         _unitOfWork = unitOfWork;
         _currentTenantService = currentTenantService;
         _systemSettingRepository = systemSettingRepository;
+        _subscriptionPlanRepository = subscriptionPlanRepository;
         _authOptions = authOptions.Value;
     }
 
@@ -234,6 +237,20 @@ public sealed class AuthService : IAuthService
         if (existing is not null)
         {
             throw new AppException("Email is already registered.");
+        }
+
+        var tenant = await _tenantRepository.GetByIdAsync(_currentTenantService.TenantId!.Value, cancellationToken);
+        if (tenant?.SubscriptionPlanId is { } subscriptionPlanId)
+        {
+            var plan = await _subscriptionPlanRepository.GetByIdAsync(subscriptionPlanId, cancellationToken);
+            if (plan is not null)
+            {
+                var currentUserCount = await _userRepository.CountByTenantAsync(cancellationToken);
+                if (currentUserCount >= plan.MaxUsers)
+                {
+                    throw new AppException("User limit reached for this tenant's subscription plan.", 409);
+                }
+            }
         }
 
         var hashedPassword = _passwordHasher.Hash(request.Password);

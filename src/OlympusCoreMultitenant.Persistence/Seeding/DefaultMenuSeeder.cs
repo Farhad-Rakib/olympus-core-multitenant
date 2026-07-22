@@ -22,6 +22,7 @@ namespace OlympusCoreMultitenant.Persistence.Seeding
             await UpsertMenuAsync(dbContext, "Site Settings", "/site-settings", "settings", Permissions.SiteSettingsRead, configuration);
             await UpsertMenuAsync(dbContext, "System Settings", "/system-settings", "sliders", Permissions.SystemSettingsManage, configuration);
             await UpsertMenuAsync(dbContext, "Tenants", "/tenants", "Building2", Permissions.TenantsManage, configuration);
+            await UpsertMenuAsync(dbContext, "Subscription Plans", "/subscription-plans", "Package", Permissions.SubscriptionPlansManage, configuration);
 
             await dbContext.SaveChangesAsync();
         }

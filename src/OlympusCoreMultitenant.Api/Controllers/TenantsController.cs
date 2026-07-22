@@ -73,8 +73,17 @@ public sealed class TenantsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> Provision(long id, [FromBody] ProvisionTenantRequestDto? request, CancellationToken cancellationToken)
     {
-        await _tenantService.ProvisionAsync(id, request?.ModuleKeys, cancellationToken);
+        await _tenantService.ProvisionAsync(id, request?.ModuleKeys, request?.SubscriptionPlanId, cancellationToken);
         return Ok(ApiResponse.SuccessResponse("Tenant provisioned successfully", StatusCodes.Status200OK));
+    }
+
+    [HttpPost("{id:long}/subscription-plan")]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AssignSubscriptionPlan(long id, [FromBody] AssignSubscriptionPlanRequestDto request, CancellationToken cancellationToken)
+    {
+        await _tenantService.AssignSubscriptionPlanAsync(id, request.SubscriptionPlanId, cancellationToken);
+        return Ok(ApiResponse.SuccessResponse("Subscription plan assigned successfully", StatusCodes.Status200OK));
     }
 
     [HttpGet("{id:long}/modules")]

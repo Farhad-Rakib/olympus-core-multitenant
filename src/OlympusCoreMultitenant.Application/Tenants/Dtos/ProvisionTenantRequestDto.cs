@@ -2,4 +2,6 @@ namespace OlympusCoreMultitenant.Application.Tenants.Dtos;
 
 // ModuleKeys are Business-module keys (see Application/Security/Modules.cs) to entitle at
 // provision time. Core is entitled automatically and should not be listed here.
-public sealed record ProvisionTenantRequestDto(IReadOnlyList<string>? ModuleKeys = null);
+// If SubscriptionPlanId is given, the plan's modules are used instead of ModuleKeys, and the
+// tenant is recorded as subscribed to that plan.
+public sealed record ProvisionTenantRequestDto(IReadOnlyList<string>? ModuleKeys = null, long? SubscriptionPlanId = null);

@@ -16,5 +16,10 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.Property(x => x.IsActive).HasDefaultValue(true);
 
         builder.HasIndex(x => x.Slug).IsUnique();
+
+        builder.HasOne<SubscriptionPlan>()
+            .WithMany()
+            .HasForeignKey(x => x.SubscriptionPlanId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
