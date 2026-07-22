@@ -10,6 +10,7 @@ public sealed class User : BaseEntity, ITenantEntity
     public string Email { get; private set; } = string.Empty;
     public string PasswordHash { get; private set; } = string.Empty;
     public bool IsActive { get; private set; } = true;
+    public bool IsPlatformSuperAdmin { get; private set; }
 
     public string? ProfileImageUrl { get; private set; }
 
@@ -42,6 +43,11 @@ public sealed class User : BaseEntity, ITenantEntity
     public void Disable()
     {
         IsActive = false;
+    }
+
+    public void GrantPlatformSuperAdmin()
+    {
+        IsPlatformSuperAdmin = true;
     }
 
     public void UpdateProfile(string fullName, string email, string? profileImageUrl = null)

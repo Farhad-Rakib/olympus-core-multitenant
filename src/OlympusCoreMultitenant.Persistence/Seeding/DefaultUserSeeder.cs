@@ -18,20 +18,13 @@ public static class DefaultUserSeeder
             return;
         }
 
-        var superAdminRole = await dbContext.Set<Role>()
-            .FirstOrDefaultAsync(role => role.Name == OlympusCoreMultitenant.Domain.Enums.SystemRoles.SuperAdmin);
-
         var superAdmin = new User(
             fullName: "Super Admin",
             email: superAdminEmail,
             passwordHash: passwordHasher.Hash(superAdminPassword)
         );
 
-        if (superAdminRole != null)
-        {
-            var userRole = new UserRole { User = superAdmin, Role = superAdminRole };
-            superAdmin.SetRoles(new[] { userRole });
-        }
+        superAdmin.GrantPlatformSuperAdmin();
 
         dbContext.Add(superAdmin);
         await dbContext.SaveChangesAsync();

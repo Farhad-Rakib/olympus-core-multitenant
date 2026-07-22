@@ -38,6 +38,11 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
             claims.Add(new Claim("permission", permission));
         }
 
+        if (user.IsPlatformSuperAdmin)
+        {
+            claims.Add(new Claim("platform_admin", "true"));
+        }
+
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.SecretKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var expiresAt = DateTime.UtcNow.AddMinutes(_jwtOptions.ExpiryMinutes);

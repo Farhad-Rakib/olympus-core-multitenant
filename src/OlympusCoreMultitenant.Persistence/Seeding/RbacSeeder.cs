@@ -22,7 +22,6 @@ public sealed class RbacSeeder : IRbacSeeder
     {
         var roles = new[]
         {
-            new Role(SystemRoles.SuperAdmin, "Full system access."),
             new Role(SystemRoles.Admin, "Administrative management access."),
             new Role(SystemRoles.User, "Basic application user access.")
         };
@@ -70,7 +69,8 @@ public sealed class RbacSeeder : IRbacSeeder
         // been seeded by SeedModuleEntitlementsAsync, which runs first.
         var entitledModuleIds = (await _dbContext.TenantModules.Select(tm => tm.ModuleId).ToListAsync(cancellationToken)).ToHashSet();
 
-        // NOTE: SuperAdmin bypasses permission checks at runtime; do NOT assign explicit permissions here.
+        // Platform superadmin status lives on User.IsPlatformSuperAdmin (a global flag, not a role),
+        // and bypasses permission checks at runtime; do NOT assign explicit permissions for it here.
 
         // Admin gets every permission from a module this tenant is currently entitled to, minus a
         // small set of destructive operations it shouldn't have by default. Platform/System module

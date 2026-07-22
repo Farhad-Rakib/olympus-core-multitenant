@@ -1,6 +1,4 @@
 using Microsoft.AspNetCore.Authorization;
-using System.Security.Claims;
-using OlympusCoreMultitenant.Domain.Enums;
 
 namespace OlympusCoreMultitenant.Api.Authorization;
 
@@ -9,8 +7,9 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
     protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, PermissionRequirement requirement)
     {
 
-        // SuperAdmin shortcut: users with the SuperAdmin role bypass permission checks
-        if (context.User.IsInRole(SystemRoles.SuperAdmin))
+        // Platform superadmin shortcut: a genuine platform-level admin (not tied to any tenant)
+        // bypasses every permission check, including tenant-scoped ones.
+        if (context.User.HasClaim(c => c.Type == "platform_admin" && c.Value == "true"))
         {
             context.Succeed(requirement);
             return Task.CompletedTask;
