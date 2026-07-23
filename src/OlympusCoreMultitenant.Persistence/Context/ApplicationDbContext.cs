@@ -1,9 +1,12 @@
 using System.Reflection;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using OlympusCoreMultitenant.Application.Common.Exceptions;
 using OlympusCoreMultitenant.Application.Common.Interfaces;
 using OlympusCoreMultitenant.Domain.Common;
 using OlympusCoreMultitenant.Domain.Entities;
+using OlympusCoreMultitenant.Domain.Enums;
 using Module = OlympusCoreMultitenant.Domain.Entities.Module;
 
 namespace OlympusCoreMultitenant.Persistence.Context;
@@ -11,11 +14,25 @@ namespace OlympusCoreMultitenant.Persistence.Context;
 public sealed class ApplicationDbContext : DbContext
 {
     private readonly ICurrentTenantService _currentTenantService;
+    private readonly ICurrentUserService _currentUserService;
 
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, ICurrentTenantService currentTenantService)
+    // Never written into an audit row's Changes payload, regardless of entity type.
+    private static readonly HashSet<string> AuditSensitiveProperties = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "PasswordHash", "TokenHash", "ReplacedByTokenHash"
+    };
+
+    // High-volume/low-audit-value entities excluded from capture entirely.
+    private static readonly HashSet<Type> AuditExcludedTypes = new()
+    {
+        typeof(RefreshToken), typeof(PasswordResetToken), typeof(AuditLog)
+    };
+
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, ICurrentTenantService currentTenantService, ICurrentUserService currentUserService)
         : base(options)
     {
         _currentTenantService = currentTenantService;
+        _currentUserService = currentUserService;
     }
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
@@ -34,6 +51,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<TenantModule> TenantModules => Set<TenantModule>();
     public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
     public DbSet<SubscriptionPlanModule> SubscriptionPlanModules => Set<SubscriptionPlanModule>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     // Referenced as `this.CurrentTenantId` inside the query filter lambdas built in SetTenantFilter.
     // EF Core's model is cached across DbContext instances (OnModelCreating runs once per app
@@ -80,13 +98,118 @@ public sealed class ApplicationDbContext : DbContext
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         ApplyTenantStamping();
-        return base.SaveChanges(acceptAllChangesOnSuccess);
+        var pending = CaptureAuditEntries();
+        var result = base.SaveChanges(acceptAllChangesOnSuccess);
+
+        if (pending.Count > 0)
+        {
+            FinalizeAuditEntries(pending);
+            base.SaveChanges(true);
+        }
+
+        return result;
     }
 
-    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         ApplyTenantStamping();
-        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        var pending = CaptureAuditEntries();
+        var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+
+        if (pending.Count > 0)
+        {
+            FinalizeAuditEntries(pending);
+            await base.SaveChangesAsync(true, cancellationToken);
+        }
+
+        return result;
+    }
+
+    // Walks every tracked entity (not just ITenantEntity) so platform-global entities (Tenant,
+    // Module, SubscriptionPlan) are covered too. Called BEFORE the real save so Modified/Deleted
+    // OriginalValues are still intact; Added entities don't have their generated Id yet, so
+    // EntityId is backfilled in FinalizeAuditEntries after the real save completes.
+    private List<(AuditLog Audit, EntityEntry Entry)> CaptureAuditEntries()
+    {
+        var pending = new List<(AuditLog, EntityEntry)>();
+
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (AuditExcludedTypes.Contains(entry.Entity.GetType()))
+            {
+                continue;
+            }
+
+            var action = entry.State switch
+            {
+                EntityState.Added => AuditAction.Created,
+                EntityState.Modified => AuditAction.Updated,
+                EntityState.Deleted => AuditAction.Deleted,
+                _ => (AuditAction?)null
+            };
+
+            if (action is null)
+            {
+                continue;
+            }
+
+            var changes = new Dictionary<string, object?>();
+            foreach (var property in entry.Properties)
+            {
+                var name = property.Metadata.Name;
+                if (AuditSensitiveProperties.Contains(name))
+                {
+                    continue;
+                }
+
+                // Redundant with EntityId, and for Added entries this is still EF's temporary
+                // in-memory placeholder key (real value isn't generated until after the real save).
+                if (name == "Id")
+                {
+                    continue;
+                }
+
+                if (entry.State == EntityState.Modified && Equals(property.OriginalValue, property.CurrentValue))
+                {
+                    continue;
+                }
+
+                changes[name] = entry.State == EntityState.Deleted ? property.OriginalValue : property.CurrentValue;
+            }
+
+            var audit = new AuditLog
+            {
+                EntityName = entry.Entity.GetType().Name,
+                EntityId = entry.State == EntityState.Added ? null : ReadIdIfPresent(entry),
+                Action = action.Value,
+                TenantId = (entry.Entity as ITenantEntity)?.TenantId,
+                UserId = _currentUserService.UserId,
+                Changes = JsonSerializer.Serialize(changes),
+                CreatedAt = DateTime.UtcNow
+            };
+
+            pending.Add((audit, entry));
+        }
+
+        return pending;
+    }
+
+    // Calls base.SaveChanges(Async) directly (never this.SaveChanges/this.SaveChangesAsync), so this
+    // second save does not recurse back into CaptureAuditEntries.
+    private void FinalizeAuditEntries(List<(AuditLog Audit, EntityEntry Entry)> pending)
+    {
+        foreach (var (audit, entry) in pending)
+        {
+            audit.EntityId ??= ReadIdIfPresent(entry);
+        }
+
+        AuditLogs.AddRange(pending.Select(p => p.Audit));
+    }
+
+    private static long? ReadIdIfPresent(EntityEntry entry)
+    {
+        var idProperty = entry.Properties.FirstOrDefault(p => p.Metadata.Name == "Id");
+        return idProperty?.CurrentValue is long id ? id : null;
     }
 
     private void ApplyTenantStamping()

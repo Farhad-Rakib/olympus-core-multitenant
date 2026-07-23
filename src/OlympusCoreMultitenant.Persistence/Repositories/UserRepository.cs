@@ -45,6 +45,15 @@ public sealed class UserRepository : BaseRepository<User>, IUserRepository
             .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<User>> GetByIdsAcrossTenantsAsync(IEnumerable<long> ids, CancellationToken cancellationToken = default)
+    {
+        var idList = ids.ToList();
+        return await DbContext.Users
+            .IgnoreQueryFilters()
+            .Where(u => idList.Contains(u.Id))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<int> CountByTenantAsync(CancellationToken cancellationToken = default)
     {
         return await DbContext.Users

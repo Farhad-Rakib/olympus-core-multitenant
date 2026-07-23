@@ -37,6 +37,7 @@ public static class Permissions
     public const string TenantsManage = "tenants.manage";
     public const string SystemSettingsManage = "system-settings.manage";
     public const string SubscriptionPlansManage = "subscription-plans.manage";
+    public const string AuditLogsRead = "audit-logs.read";
 
     public static readonly string[] All =
     [
@@ -74,6 +75,7 @@ public static class Permissions
         SystemCacheFlush,
         TenantsManage,
         SystemSettingsManage,
-        SubscriptionPlansManage
+        SubscriptionPlansManage,
+        AuditLogsRead
     ];
 }

@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddScoped<IEmailService, SmtpEmailService>();
         services.AddSingleton<ICurrentTenantService, CurrentTenantService>();
+        services.AddSingleton<ICurrentUserService, CurrentUserService>();
 
         return services;
     }

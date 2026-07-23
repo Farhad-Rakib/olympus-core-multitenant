@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using OlympusCoreMultitenant.Application.Auth;
+using OlympusCoreMultitenant.Application.AuditLogs;
 using OlympusCoreMultitenant.Application.Menu;
 using OlympusCoreMultitenant.Application.Permissions;
 using OlympusCoreMultitenant.Application.Roles;
@@ -25,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<IMenuService, MenuService>();
         services.AddScoped<ITenantService, TenantService>();
         services.AddScoped<ISubscriptionPlanService, SubscriptionPlanService>();
+        services.AddScoped<IAuditLogService, AuditLogService>();
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
 
         return services;

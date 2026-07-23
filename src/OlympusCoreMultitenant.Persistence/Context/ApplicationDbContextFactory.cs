@@ -22,7 +22,7 @@ public sealed class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Ap
             throw new InvalidOperationException($"Unsupported database provider '{provider}'. Supported values: postgres, sqlserver.");
         }
 
-        // Design-time only: migrations never execute queries, so an unresolved tenant context is fine here.
-        return new ApplicationDbContext(optionsBuilder.Options, new CurrentTenantService());
+        // Design-time only: migrations never execute queries, so an unresolved tenant/user context is fine here.
+        return new ApplicationDbContext(optionsBuilder.Options, new CurrentTenantService(), new CurrentUserService());
     }
 }

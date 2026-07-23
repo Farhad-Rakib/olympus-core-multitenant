@@ -16,8 +16,14 @@ public sealed class TenantResolutionMiddleware
         _next = next;
     }
 
-    public async Task InvokeAsync(HttpContext context, ApplicationDbContext dbContext, ICurrentTenantService currentTenantService)
+    public async Task InvokeAsync(HttpContext context, ApplicationDbContext dbContext, ICurrentTenantService currentTenantService, ICurrentUserService currentUserService)
     {
+        var userIdClaim = context.User.FindFirst("sub")?.Value;
+        if (context.User.Identity?.IsAuthenticated == true && long.TryParse(userIdClaim, out var userId))
+        {
+            currentUserService.Set(userId);
+        }
+
         var endpoint = context.GetEndpoint();
         if (endpoint is null || endpoint.Metadata.GetMetadata<ISkipTenantResolutionMetadata>() is not null)
         {
