@@ -41,6 +41,7 @@ This repository is a layered ASP.NET Core API built around `OlympusCoreMultitena
 - `Jwt:RefreshTokenExpiryDays`
 - `Smtp:*`
 - `Serilog:*`
+- `Bootstrap:PlatformAdminEmail` / `Bootstrap:PlatformAdminPassword` (the one-time global platform-admin account seeded on first run; leave the password empty to have one generated and logged instead — see `PlatformAdminSeeder`)
 
 ## Editing Guidance
 

@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OlympusCoreMultitenant.Application.Common.Interfaces;
+using OlympusCoreMultitenant.Application.Common.Interfaces.Security;
 using OlympusCoreMultitenant.Domain.Entities;
 using OlympusCoreMultitenant.Persistence.Context;
 
@@ -12,15 +14,24 @@ public sealed class EfCoreDatabaseBootstrapper : IDatabaseBootstrapper
 
     private readonly ApplicationDbContext _dbContext;
     private readonly ITenantProvisioningService _tenantProvisioningService;
+    private readonly ICurrentTenantService _currentTenantService;
+    private readonly IPasswordHasher _passwordHasher;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<EfCoreDatabaseBootstrapper> _logger;
 
     public EfCoreDatabaseBootstrapper(
         ApplicationDbContext dbContext,
         ITenantProvisioningService tenantProvisioningService,
+        ICurrentTenantService currentTenantService,
+        IPasswordHasher passwordHasher,
+        IConfiguration configuration,
         ILogger<EfCoreDatabaseBootstrapper> logger)
     {
         _dbContext = dbContext;
         _tenantProvisioningService = tenantProvisioningService;
+        _currentTenantService = currentTenantService;
+        _passwordHasher = passwordHasher;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -51,5 +62,12 @@ public sealed class EfCoreDatabaseBootstrapper : IDatabaseBootstrapper
         _logger?.Log(LogLevel.Debug, "Provisioning default tenant...");
         await _tenantProvisioningService.ProvisionAsync(defaultTenant, moduleKeys: null, cancellationToken);
         _logger?.Log(LogLevel.Debug, "Default tenant provisioning complete.");
+
+        // Global, one-time-ever bootstrap admin -- NOT part of ProvisionAsync, which runs for
+        // every tenant. See PlatformAdminSeeder for why that distinction matters.
+        using (_currentTenantService.BeginScope(defaultTenant.Id, defaultTenant.Slug))
+        {
+            await PlatformAdminSeeder.SeedAsync(_dbContext, _passwordHasher, _configuration, _logger!);
+        }
     }
 }

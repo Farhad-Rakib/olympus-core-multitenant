@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using OlympusCoreMultitenant.Application.Common.Interfaces;
-using OlympusCoreMultitenant.Application.Common.Interfaces.Security;
 using OlympusCoreMultitenant.Application.Security;
 using OlympusCoreMultitenant.Domain.Entities;
 using OlympusCoreMultitenant.Domain.Enums;
@@ -13,20 +12,22 @@ public sealed class TenantProvisioningService : ITenantProvisioningService
     private readonly ApplicationDbContext _dbContext;
     private readonly ICurrentTenantService _currentTenantService;
     private readonly IRbacSeeder _rbacSeeder;
-    private readonly IPasswordHasher _passwordHasher;
 
     public TenantProvisioningService(
         ApplicationDbContext dbContext,
         ICurrentTenantService currentTenantService,
-        IRbacSeeder rbacSeeder,
-        IPasswordHasher passwordHasher)
+        IRbacSeeder rbacSeeder)
     {
         _dbContext = dbContext;
         _currentTenantService = currentTenantService;
         _rbacSeeder = rbacSeeder;
-        _passwordHasher = passwordHasher;
     }
 
+    // Deliberately does NOT seed any user here (previously did, via the now-removed
+    // DefaultUserSeeder call -- see PlatformAdminSeeder for why that was a security problem).
+    // Activate leaves user creation to the admin via the Users page; Approve creates the real
+    // admin from what the invitee submitted. Only the one-time global bootstrap admin (seeded
+    // separately by EfCoreDatabaseBootstrapper, not per-tenant) is exempt from that rule.
     public async Task ProvisionAsync(Tenant tenant, IReadOnlyList<string>? moduleKeys = null, CancellationToken cancellationToken = default)
     {
         using var scope = _currentTenantService.BeginScope(tenant.Id, tenant.Slug);
@@ -35,7 +36,6 @@ public sealed class TenantProvisioningService : ITenantProvisioningService
         // permissions from modules this tenant is actually entitled to.
         await SeedModuleEntitlementsAsync(moduleKeys, cancellationToken);
         await _rbacSeeder.SeedAsync(cancellationToken);
-        await DefaultUserSeeder.SeedAsync(_dbContext, _passwordHasher);
         await DefaultSiteSettingsSeeder.SeedAsync(_dbContext);
         await DefaultMenuSeeder.SeedAsync(_dbContext);
     }
