@@ -32,8 +32,29 @@ public sealed class TenantResolutionMiddleware
         }
 
         var tenantIdClaim = context.User.FindFirst("tenant_id")?.Value;
+        var isPlatformAdmin = context.User.HasClaim(c => c.Type == "platform_admin" && c.Value == "true");
+        var tenantOverrideSlug = context.Request.Headers[TenantHeaderName].ToString().Trim().ToLowerInvariant();
 
-        if (context.User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(tenantIdClaim))
+        // Platform super admins are pinned to their home tenant's JWT claim like everyone else, but
+        // they legitimately need to act on other tenants' data (manage users/roles/permissions there)
+        // without re-authenticating as a member of that tenant. Let them override the ambient tenant
+        // per-request via the same X-Tenant-Id header anonymous requests already use. Anyone without
+        // the platform_admin claim is always confined to their JWT's tenant_id -- this header is a
+        // no-op for them so a regular user can't spoof their way into another tenant's data.
+        if (context.User.Identity?.IsAuthenticated == true && isPlatformAdmin && !string.IsNullOrWhiteSpace(tenantOverrideSlug))
+        {
+            var overrideTenant = await dbContext.Tenants.AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Slug == tenantOverrideSlug, context.RequestAborted);
+
+            if (overrideTenant is null || !overrideTenant.IsActive)
+            {
+                await WriteProblemAsync(context, StatusCodes.Status400BadRequest, "Unknown or inactive tenant.");
+                return;
+            }
+
+            currentTenantService.Set(overrideTenant.Id, overrideTenant.Slug);
+        }
+        else if (context.User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(tenantIdClaim))
         {
             if (!long.TryParse(tenantIdClaim, out var tenantId))
             {
