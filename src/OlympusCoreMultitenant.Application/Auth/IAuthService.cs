@@ -5,7 +5,7 @@ namespace OlympusCoreMultitenant.Application.Auth;
 public interface IAuthService
 {
     Task<LoginConfigDto> GetLoginConfigAsync(CancellationToken cancellationToken = default);
-    Task<AuthTokensDto> LoginAsync(LoginRequestDto request, CancellationToken cancellationToken = default);
+    Task<LoginResultDto> LoginAsync(LoginRequestDto request, CancellationToken cancellationToken = default);
     Task<AuthTokensDto> RefreshTokenAsync(RefreshTokenRequestDto request, CancellationToken cancellationToken = default);
     Task RevokeRefreshTokenAsync(RevokeRefreshTokenRequestDto request, CancellationToken cancellationToken = default);
     Task<UserRegistrationResult> RegisterAsync(RegisterUserRequestDto request, CancellationToken cancellationToken = default);

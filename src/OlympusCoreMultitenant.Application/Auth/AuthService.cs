@@ -5,6 +5,7 @@ using OlympusCoreMultitenant.Application.Common.Exceptions;
 using OlympusCoreMultitenant.Application.Common.Interfaces;
 using OlympusCoreMultitenant.Application.Common.Interfaces.Security;
 using OlympusCoreMultitenant.Application.Common.Interfaces.Services;
+using OlympusCoreMultitenant.Application.SiteSettings;
 using OlympusCoreMultitenant.Application.Users.Dtos;
 using OlympusCoreMultitenant.Domain.Entities;
 using System.Security.Cryptography;
@@ -29,6 +30,7 @@ public sealed class AuthService : IAuthService
     private readonly ICurrentTenantService _currentTenantService;
     private readonly ISystemSettingRepository _systemSettingRepository;
     private readonly ISubscriptionPlanRepository _subscriptionPlanRepository;
+    private readonly ISiteSettingService _siteSettingService;
     private readonly AuthOptions _authOptions;
 
     public AuthService(
@@ -47,6 +49,7 @@ public sealed class AuthService : IAuthService
         ICurrentTenantService currentTenantService,
         ISystemSettingRepository systemSettingRepository,
         ISubscriptionPlanRepository subscriptionPlanRepository,
+        ISiteSettingService siteSettingService,
         IOptions<AuthOptions> authOptions)
     {
         _userRepository = userRepository;
@@ -64,6 +67,7 @@ public sealed class AuthService : IAuthService
         _currentTenantService = currentTenantService;
         _systemSettingRepository = systemSettingRepository;
         _subscriptionPlanRepository = subscriptionPlanRepository;
+        _siteSettingService = siteSettingService;
         _authOptions = authOptions.Value;
     }
 
@@ -86,7 +90,7 @@ public sealed class AuthService : IAuthService
         return new LoginConfigDto(scope == EmailUniquenessScope.PerTenant);
     }
 
-    public async Task<AuthTokensDto> LoginAsync(LoginRequestDto request, CancellationToken cancellationToken = default)
+    public async Task<LoginResultDto> LoginAsync(LoginRequestDto request, CancellationToken cancellationToken = default)
     {
         var scope = await GetEffectiveScopeAsync(cancellationToken);
         return scope == EmailUniquenessScope.Global
@@ -100,7 +104,7 @@ public sealed class AuthService : IAuthService
     // own captured context wins). So tenant resolution (BeginScope) and every subsequent
     // tenant-scoped query for a single login/register attempt must live in one unbroken async
     // flow — never split across a "resolve tenant" helper that returns before dependent queries run.
-    private async Task<AuthTokensDto> LoginWithTenantSlugAsync(LoginRequestDto request, CancellationToken cancellationToken)
+    private async Task<LoginResultDto> LoginWithTenantSlugAsync(LoginRequestDto request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.TenantSlug))
         {
@@ -123,10 +127,12 @@ public sealed class AuthService : IAuthService
         }
 
         var permissions = await _permissionRepository.GetPermissionNamesForUserAsync(user.Id, cancellationToken);
-        return await GenerateAuthTokensAsync(user, permissions, cancellationToken);
+        var tokens = await GenerateAuthTokensAsync(user, permissions, cancellationToken);
+        var branding = await _siteSettingService.GetTenantBrandingAsync(cancellationToken);
+        return new LoginResultDto(tokens, branding);
     }
 
-    private async Task<AuthTokensDto> LoginWithGlobalEmailAsync(LoginRequestDto request, CancellationToken cancellationToken)
+    private async Task<LoginResultDto> LoginWithGlobalEmailAsync(LoginRequestDto request, CancellationToken cancellationToken)
     {
         var user = await _userRepository.GetByEmailAcrossTenantsAsync(request.Email, cancellationToken);
         if (user is null)
@@ -148,7 +154,9 @@ public sealed class AuthService : IAuthService
         }
 
         var permissions = await _permissionRepository.GetPermissionNamesForUserAsync(user.Id, cancellationToken);
-        return await GenerateAuthTokensAsync(user, permissions, cancellationToken);
+        var tokens = await GenerateAuthTokensAsync(user, permissions, cancellationToken);
+        var branding = await _siteSettingService.GetTenantBrandingAsync(cancellationToken);
+        return new LoginResultDto(tokens, branding);
     }
 
     public async Task<AuthTokensDto> RefreshTokenAsync(RefreshTokenRequestDto request, CancellationToken cancellationToken = default)

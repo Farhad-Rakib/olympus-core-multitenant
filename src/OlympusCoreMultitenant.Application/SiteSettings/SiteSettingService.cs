@@ -6,6 +6,10 @@ namespace OlympusCoreMultitenant.Application.SiteSettings;
 
 public sealed class SiteSettingService : ISiteSettingService
 {
+    private const string TitleKey = "Site.Title";
+    private const string LogoUrlKey = "Site.LogoUrl";
+    private const string TaglineKey = "Site.Tagline";
+
     private readonly ISiteSettingRepository _siteSettingRepository;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -64,6 +68,15 @@ public sealed class SiteSettingService : ISiteSettingService
 
         _siteSettingRepository.Delete(setting);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<TenantBrandingDto> GetTenantBrandingAsync(CancellationToken cancellationToken = default)
+    {
+        var title = await _siteSettingRepository.GetByKeyAsync(TitleKey, cancellationToken);
+        var logoUrl = await _siteSettingRepository.GetByKeyAsync(LogoUrlKey, cancellationToken);
+        var tagline = await _siteSettingRepository.GetByKeyAsync(TaglineKey, cancellationToken);
+
+        return new TenantBrandingDto(title?.Value, logoUrl?.Value, tagline?.Value);
     }
 
     private static SiteSettingDto MapToDto(SiteSetting setting)

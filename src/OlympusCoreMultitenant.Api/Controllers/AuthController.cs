@@ -56,13 +56,13 @@ public sealed class AuthController : ControllerBase
     [AllowAnonymous]
     [SkipTenantResolution]
     [HttpPost("login")]
-    [ProducesResponseType(typeof(ApiResponse<AuthTokensDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<LoginResultDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto request, CancellationToken cancellationToken)
     {
         await _loginValidator.ValidateAndThrowAsync(request, cancellationToken);
         var response = await _authService.LoginAsync(request, cancellationToken);
 
-        return Ok(ApiResponse<AuthTokensDto>.SuccessResponse(response, "Login successful", StatusCodes.Status200OK));
+        return Ok(ApiResponse<LoginResultDto>.SuccessResponse(response, "Login successful", StatusCodes.Status200OK));
     }
 
     [AllowAnonymous]
