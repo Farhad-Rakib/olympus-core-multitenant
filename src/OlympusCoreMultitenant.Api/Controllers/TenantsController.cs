@@ -77,6 +77,30 @@ public sealed class TenantsController : ControllerBase
         return Ok(ApiResponse.SuccessResponse("Tenant provisioned successfully", StatusCodes.Status200OK));
     }
 
+    [HttpPost("{id:long}/registration-link")]
+    [ProducesResponseType(typeof(ApiResponse<TenantRegistrationLinkDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GenerateRegistrationLink(long id, CancellationToken cancellationToken)
+    {
+        var link = await _tenantService.GenerateRegistrationLinkAsync(id, cancellationToken);
+        return Ok(ApiResponse<TenantRegistrationLinkDto>.SuccessResponse(link, "Registration link generated successfully"));
+    }
+
+    [HttpGet("{id:long}/pending-registration")]
+    [ProducesResponseType(typeof(ApiResponse<PendingTenantRegistrationDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPendingRegistration(long id, CancellationToken cancellationToken)
+    {
+        var pending = await _tenantService.GetPendingRegistrationAsync(id, cancellationToken);
+        return Ok(ApiResponse<PendingTenantRegistrationDto?>.SuccessResponse(pending, "Pending registration retrieved successfully"));
+    }
+
+    [HttpPost("{id:long}/approve-registration")]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ApproveRegistration(long id, [FromBody] ProvisionTenantRequestDto? request, CancellationToken cancellationToken)
+    {
+        await _tenantService.ApproveRegistrationAsync(id, request?.SubscriptionPlanId, cancellationToken);
+        return Ok(ApiResponse.SuccessResponse("Registration approved and tenant activated successfully", StatusCodes.Status200OK));
+    }
+
     [HttpPost("{id:long}/subscription-plan")]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]

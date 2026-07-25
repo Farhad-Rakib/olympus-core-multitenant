@@ -6,6 +6,7 @@ public sealed class Tenant : BaseEntity
     public string Name { get; private set; } = string.Empty;
     public bool IsActive { get; private set; } = true;
     public long? SubscriptionPlanId { get; private set; }
+    public bool IsProvisioned { get; private set; }
 
     private Tenant()
     {
@@ -42,5 +43,10 @@ public sealed class Tenant : BaseEntity
     public void AssignSubscriptionPlan(long? subscriptionPlanId)
     {
         SubscriptionPlanId = subscriptionPlanId;
+    }
+
+    public void MarkProvisioned()
+    {
+        IsProvisioned = true;
     }
 }

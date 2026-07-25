@@ -14,4 +14,9 @@ public interface ITenantService
     Task EnableModuleAsync(long tenantId, long moduleId, CancellationToken cancellationToken = default);
     Task DisableModuleAsync(long tenantId, long moduleId, CancellationToken cancellationToken = default);
     Task AssignSubscriptionPlanAsync(long tenantId, long subscriptionPlanId, CancellationToken cancellationToken = default);
+    Task<TenantRegistrationLinkDto> GenerateRegistrationLinkAsync(long tenantId, CancellationToken cancellationToken = default);
+    Task<TenantRegistrationInfoDto> GetRegistrationInfoAsync(string token, CancellationToken cancellationToken = default);
+    Task SubmitRegistrationAsync(SubmitTenantRegistrationRequestDto request, CancellationToken cancellationToken = default);
+    Task<PendingTenantRegistrationDto?> GetPendingRegistrationAsync(long tenantId, CancellationToken cancellationToken = default);
+    Task ApproveRegistrationAsync(long tenantId, long? subscriptionPlanId = null, CancellationToken cancellationToken = default);
 }
