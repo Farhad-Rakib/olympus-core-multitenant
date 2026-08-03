@@ -1,5 +1,5 @@
 using OlympusCoreMultitenant.Application.Common.Interfaces;
-using OlympusCoreMultitenant.Application.Security;
+using OlympusCoreMultitenant.Application.ModuleSystem;
 using ModuleEntity = OlympusCoreMultitenant.Domain.Entities.Module;
 
 namespace OlympusCoreMultitenant.Api.Startup;
@@ -9,12 +9,14 @@ public sealed class ModuleSyncService
     private readonly IModuleRepository _moduleRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<ModuleSyncService> _logger;
+    private readonly IReadOnlyList<IOlympusModule> _modules;
 
-    public ModuleSyncService(IModuleRepository moduleRepository, IUnitOfWork unitOfWork, ILogger<ModuleSyncService> logger)
+    public ModuleSyncService(IModuleRepository moduleRepository, IUnitOfWork unitOfWork, ILogger<ModuleSyncService> logger, IReadOnlyList<IOlympusModule> modules)
     {
         _moduleRepository = moduleRepository;
         _unitOfWork = unitOfWork;
         _logger = logger;
+        _modules = modules;
     }
 
     public async Task SyncAsync(CancellationToken cancellationToken = default)
@@ -25,7 +27,7 @@ public sealed class ModuleSyncService
             var existingKeys = new HashSet<string>(existing.Select(m => m.Key), StringComparer.OrdinalIgnoreCase);
 
             var toAdd = new List<ModuleEntity>();
-            foreach (var definition in Modules.All)
+            foreach (var definition in _modules)
             {
                 if (!existingKeys.Contains(definition.Key))
                 {

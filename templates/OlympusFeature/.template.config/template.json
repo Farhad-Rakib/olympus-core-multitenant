@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Olympus",
+  "classifications": ["Olympus", "Feature"],
+  "identity": "Olympus.Templates.Feature",
+  "name": "Olympus Vertical-Slice Feature",
+  "shortName": "olympus-feature",
+  "sourceName": "SampleFeature",
+  "preferNameDirectory": false,
+  "symbols": {
+    "module": {
+      "type": "parameter",
+      "datatype": "string",
+      "isRequired": true,
+      "description": "Name of the existing module (folder under Modules/) this feature belongs to.",
+      "fileRename": "SamplePlaceholderModule",
+      "replaces": "SamplePlaceholderModule"
+    },
+    "moduleKeyPrefix": {
+      "type": "generated",
+      "generator": "casing",
+      "parameters": {
+        "source": "module",
+        "toLower": true
+      },
+      "replaces": "samplemodule"
+    }
+  }
+}

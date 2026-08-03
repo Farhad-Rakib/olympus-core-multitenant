@@ -1,9 +1,14 @@
 using System.Security.Cryptography;
+using Microsoft.Extensions.Options;
+using OlympusCoreMultitenant.Application.Common.Configuration;
 using OlympusCoreMultitenant.Application.Common.Exceptions;
 using OlympusCoreMultitenant.Application.Common.Interfaces;
 using OlympusCoreMultitenant.Application.Common.Interfaces.Security;
+using OlympusCoreMultitenant.Application.Integration;
+using OlympusCoreMultitenant.Application.Licensing;
 using OlympusCoreMultitenant.Application.Security;
 using OlympusCoreMultitenant.Application.Tenants.Dtos;
+using OlympusCoreMultitenant.Application.Tenants.Events;
 using OlympusCoreMultitenant.Domain.Entities;
 using OlympusCoreMultitenant.Domain.Enums;
 
@@ -22,9 +27,12 @@ public sealed class TenantService : ITenantService
     private readonly ITenantProvisioningService _tenantProvisioningService;
     private readonly ICurrentTenantService _currentTenantService;
     private readonly ITenantRegistrationTokenRepository _tenantRegistrationTokenRepository;
-    private readonly IUserRepository _userRepository;
-    private readonly IRoleRepository _roleRepository;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly ITenantDomainRepository _tenantDomainRepository;
+    private readonly ITenantOffboardingService _tenantOffboardingService;
+    private readonly TenantOffboardingOptions _offboardingOptions;
+    private readonly ILicenseService _licenseService;
+    private readonly IEventBus _eventBus;
 
     public TenantService(
         IRepository<Tenant> tenantRepository,
@@ -36,9 +44,12 @@ public sealed class TenantService : ITenantService
         ITenantProvisioningService tenantProvisioningService,
         ICurrentTenantService currentTenantService,
         ITenantRegistrationTokenRepository tenantRegistrationTokenRepository,
-        IUserRepository userRepository,
-        IRoleRepository roleRepository,
-        IPasswordHasher passwordHasher)
+        IPasswordHasher passwordHasher,
+        ITenantDomainRepository tenantDomainRepository,
+        ITenantOffboardingService tenantOffboardingService,
+        IOptions<TenantOffboardingOptions> offboardingOptions,
+        ILicenseService licenseService,
+        IEventBus eventBus)
     {
         _tenantRepository = tenantRepository;
         _moduleRepository = moduleRepository;
@@ -49,9 +60,12 @@ public sealed class TenantService : ITenantService
         _tenantProvisioningService = tenantProvisioningService;
         _currentTenantService = currentTenantService;
         _tenantRegistrationTokenRepository = tenantRegistrationTokenRepository;
-        _userRepository = userRepository;
-        _roleRepository = roleRepository;
         _passwordHasher = passwordHasher;
+        _tenantDomainRepository = tenantDomainRepository;
+        _tenantOffboardingService = tenantOffboardingService;
+        _offboardingOptions = offboardingOptions.Value;
+        _licenseService = licenseService;
+        _eventBus = eventBus;
     }
 
     public async Task<IReadOnlyList<TenantDto>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -346,17 +360,15 @@ public sealed class TenantService : ITenantService
 
         await _tenantProvisioningService.ProvisionAsync(tenant, effectiveModuleKeys, cancellationToken);
 
-        var adminUser = new User(pending.PendingFullName!, pending.PendingEmail!, pending.PendingPasswordHash!);
-
-        var adminRole = await _roleRepository.GetByNameAsync(SystemRoles.Admin, cancellationToken)
-            ?? throw new AppException("Admin role is missing for this tenant.", 500);
-
-        adminUser.SetRoles(new[]
-        {
-            new UserRole { UserId = adminUser.Id, RoleId = adminRole.Id, User = adminUser, Role = adminRole }
-        });
-
-        await _userRepository.AddAsync(adminUser, cancellationToken);
+        // Publishing instead of constructing the admin User/Role directly: this flow doesn't need
+        // to know how "create an admin account" is implemented, only that the fact happened. See
+        // CreateAdminUserOnTenantApprovedHandler for the reaction. Published before the
+        // SaveChangesAsync below (not after) -- the handler only tracks the new entities via the
+        // same scoped DbContext, so they still commit atomically with the rest of this method's
+        // work, exactly as when this was one inline block.
+        await _eventBus.PublishAsync(
+            new TenantApprovedIntegrationEvent(tenant.Id, tenant.Slug, pending.PendingFullName!, pending.PendingEmail!, pending.PendingPasswordHash!),
+            cancellationToken);
 
         pending.MarkUsed();
         _tenantRegistrationTokenRepository.Update(pending);
@@ -369,6 +381,161 @@ public sealed class TenantService : ITenantService
         tenant.MarkProvisioned();
         _tenantRepository.Update(tenant);
 
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    // Catches an already-provisioned tenant up on RbacSeeder/DefaultMenuSeeder defaults added after
+    // it was first provisioned. Never touches module entitlements -- those change only through
+    // EnableModule/DisableModule/AssignSubscriptionPlan, not by silently re-adding what an admin
+    // deliberately revoked.
+    public async Task ReprovisionCatalogAsync(long tenantId, CancellationToken cancellationToken = default)
+    {
+        var tenant = await _tenantRepository.GetByIdAsync(tenantId, cancellationToken)
+            ?? throw new AppException("Tenant not found.", 404);
+
+        if (!tenant.IsProvisioned)
+        {
+            throw new AppException("Tenant must be provisioned before its catalog can be resynced.", 409);
+        }
+
+        await _tenantProvisioningService.ResyncCatalogAsync(tenant, cancellationToken);
+    }
+
+    public async Task<TenantCatalogResyncResultDto> ReprovisionAllCatalogsAsync(CancellationToken cancellationToken = default)
+    {
+        var tenants = await _tenantRepository.GetAllAsync(cancellationToken);
+        var resyncedIds = new List<long>();
+        var skippedCount = 0;
+
+        foreach (var tenant in tenants)
+        {
+            if (!tenant.IsProvisioned)
+            {
+                skippedCount++;
+                continue;
+            }
+
+            await _tenantProvisioningService.ResyncCatalogAsync(tenant, cancellationToken);
+            resyncedIds.Add(tenant.Id);
+        }
+
+        return new TenantCatalogResyncResultDto(resyncedIds.Count, skippedCount, resyncedIds);
+    }
+
+    public async Task<IReadOnlyList<TenantDomainDto>> GetDomainsAsync(long tenantId, CancellationToken cancellationToken = default)
+    {
+        var domains = await _tenantDomainRepository.GetByTenantIdAsync(tenantId, cancellationToken);
+        return domains.Select(d => new TenantDomainDto(d.Id, d.Domain)).ToList();
+    }
+
+    public async Task<TenantDomainDto> AddDomainAsync(long tenantId, string domain, CancellationToken cancellationToken = default)
+    {
+        var tenant = await _tenantRepository.GetByIdAsync(tenantId, cancellationToken)
+            ?? throw new AppException("Tenant not found.", 404);
+
+        var normalized = domain.Trim().ToLowerInvariant();
+        var existing = await _tenantDomainRepository.GetByDomainAsync(normalized, cancellationToken);
+        if (existing is not null)
+        {
+            throw new AppException("This domain is already assigned to a tenant.", 409);
+        }
+
+        var tenantDomain = new TenantDomain(tenant.Id, normalized);
+        await _tenantDomainRepository.AddAsync(tenantDomain, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return new TenantDomainDto(tenantDomain.Id, tenantDomain.Domain);
+    }
+
+    public async Task RemoveDomainAsync(long tenantId, long domainId, CancellationToken cancellationToken = default)
+    {
+        var tenantDomain = await _tenantDomainRepository.GetByIdAsync(domainId, cancellationToken);
+        if (tenantDomain is null || tenantDomain.TenantId != tenantId)
+        {
+            return;
+        }
+
+        _tenantDomainRepository.Delete(tenantDomain);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<TenantExportDto> ExportAsync(long tenantId, CancellationToken cancellationToken = default)
+    {
+        var tenant = await _tenantRepository.GetByIdAsync(tenantId, cancellationToken)
+            ?? throw new AppException("Tenant not found.", 404);
+
+        return await _tenantOffboardingService.ExportAsync(tenant, cancellationToken);
+    }
+
+    public async Task PurgeAsync(long tenantId, string confirmationSlug, CancellationToken cancellationToken = default)
+    {
+        var tenant = await _tenantRepository.GetByIdAsync(tenantId, cancellationToken)
+            ?? throw new AppException("Tenant not found.", 404);
+
+        if (tenant.IsActive)
+        {
+            throw new AppException("Tenant must be disabled before it can be purged.", 409);
+        }
+
+        var coolingOffPeriod = TimeSpan.FromDays(_offboardingOptions.PurgeCoolingOffDays);
+        if (tenant.DisabledAtUtc is null || DateTime.UtcNow - tenant.DisabledAtUtc.Value < coolingOffPeriod)
+        {
+            var remaining = tenant.DisabledAtUtc is null
+                ? coolingOffPeriod
+                : coolingOffPeriod - (DateTime.UtcNow - tenant.DisabledAtUtc.Value);
+            throw new AppException(
+                $"Tenant must remain disabled for {_offboardingOptions.PurgeCoolingOffDays} day(s) before it can be purged. " +
+                $"Approximately {Math.Max(0, Math.Ceiling(remaining.TotalDays))} day(s) remaining.", 409);
+        }
+
+        if (!string.Equals(confirmationSlug?.Trim(), tenant.Slug, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new AppException("Confirmation slug does not match the tenant being purged.", 400);
+        }
+
+        await _tenantOffboardingService.PurgeAsync(tenant, cancellationToken);
+    }
+
+    public Task<LicenseStatus> GetLicenseStatusAsync(long tenantId, CancellationToken cancellationToken = default) =>
+        _licenseService.GetStatusAsync(tenantId, cancellationToken);
+
+    public async Task StartTrialAsync(long tenantId, DateTime trialEndsAtUtc, CancellationToken cancellationToken = default)
+    {
+        var tenant = await _tenantRepository.GetByIdAsync(tenantId, cancellationToken)
+            ?? throw new AppException("Tenant not found.", 404);
+
+        tenant.StartTrial(trialEndsAtUtc);
+        _tenantRepository.Update(tenant);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SetLicenseExpiryAsync(long tenantId, DateTime? licenseExpiresAtUtc, CancellationToken cancellationToken = default)
+    {
+        var tenant = await _tenantRepository.GetByIdAsync(tenantId, cancellationToken)
+            ?? throw new AppException("Tenant not found.", 404);
+
+        tenant.SetLicenseExpiry(licenseExpiresAtUtc);
+        _tenantRepository.Update(tenant);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SuspendLicenseAsync(long tenantId, CancellationToken cancellationToken = default)
+    {
+        var tenant = await _tenantRepository.GetByIdAsync(tenantId, cancellationToken)
+            ?? throw new AppException("Tenant not found.", 404);
+
+        tenant.Suspend();
+        _tenantRepository.Update(tenant);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UnsuspendLicenseAsync(long tenantId, CancellationToken cancellationToken = default)
+    {
+        var tenant = await _tenantRepository.GetByIdAsync(tenantId, cancellationToken)
+            ?? throw new AppException("Tenant not found.", 404);
+
+        tenant.Unsuspend();
+        _tenantRepository.Update(tenant);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 

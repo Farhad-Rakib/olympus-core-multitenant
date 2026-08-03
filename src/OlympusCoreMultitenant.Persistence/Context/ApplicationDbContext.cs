@@ -45,6 +45,8 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<SiteSetting> SiteSettings => Set<SiteSetting>();
+    public DbSet<TenantFeatureFlag> TenantFeatureFlags => Set<TenantFeatureFlag>();
+    public DbSet<TenantDomain> TenantDomains => Set<TenantDomain>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
     public DbSet<Menu> Menus => Set<Menu>();
     public DbSet<Notification> Notifications => Set<Notification>();

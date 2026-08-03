@@ -1,12 +1,16 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using OlympusCoreMultitenant.Api.Authorization;
+using OlympusCoreMultitenant.Api.Common;
 using OlympusCoreMultitenant.Api.Middleware;
 using OlympusCoreMultitenant.Application;
+using OlympusCoreMultitenant.Application.Common.Configuration;
 using OlympusCoreMultitenant.Application.Security;
 using OlympusCoreMultitenant.Infrastructure;
 using OlympusCoreMultitenant.Infrastructure.Authentication;
@@ -138,6 +142,11 @@ builder.Services.AddPersistence(builder.Configuration);
 // Auth: bind options controlling email-uniqueness scope (PerTenant requires TenantSlug at login, Global does not)
 builder.Services.Configure<OlympusCoreMultitenant.Application.Common.Configuration.AuthOptions>(builder.Configuration.GetSection("Auth"));
 
+// Tenancy: BaseDomain enables subdomain-based tenant resolution (e.g. acme.olympus.app -> slug "acme")
+builder.Services.Configure<TenancyOptions>(builder.Configuration.GetSection("Tenancy"));
+builder.Services.Configure<OlympusCoreMultitenant.Application.Common.Configuration.TenantOffboardingOptions>(builder.Configuration.GetSection("TenantOffboarding"));
+builder.Services.Configure<OlympusCoreMultitenant.Application.Common.Configuration.LicensingOptions>(builder.Configuration.GetSection("Licensing"));
+
 // Caching: bind options and register distributed cache (Redis if configured)
 var cachingSection = builder.Configuration.GetSection("Caching");
 builder.Services.Configure<OlympusCoreMultitenant.Application.Common.Configuration.CachingOptions>(cachingSection);
@@ -182,12 +191,20 @@ builder.Services
         };
     });
 
+// Discovered once at boot (assembly scan, not I/O) and registered as a singleton -- every service
+// that used to consume the static Modules.All/Permissions.All/Modules.PermissionModuleMap now
+// consumes this instead. Replace the scanned assembly list with a growing set of module-provider
+// assemblies as real business modules are added later.
+var discoveredModules = new OlympusCoreMultitenant.Application.ModuleSystem.ModuleHost()
+    .DiscoverModules([typeof(OlympusCoreMultitenant.Application.DependencyInjection).Assembly]);
+builder.Services.AddSingleton<IReadOnlyList<OlympusCoreMultitenant.Application.ModuleSystem.IOlympusModule>>(discoveredModules);
+
 builder.Services.AddAuthorization(options =>
 {
-    foreach (var permission in Permissions.All)
+    foreach (var permission in discoveredModules.SelectMany(m => m.Permissions))
     {
-        options.AddPolicy(permission, policy =>
-            policy.Requirements.Add(new PermissionRequirement(permission)));
+        options.AddPolicy(permission.Name, policy =>
+            policy.Requirements.Add(new PermissionRequirement(permission.Name)));
     }
 
     options.AddPolicy(Policies.UsersReadOwnOrAny, policy =>
@@ -196,6 +213,46 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddSingleton<IAuthorizationHandler, SelfOrPermissionAuthorizationHandler>();
+
+// Rate limiting: partitioned per tenant (JWT tenant_id claim) so one noisy tenant can't starve
+// another's throughput; unauthenticated requests (login, registration submission) partition by
+// remote IP instead. Reads the raw claim directly rather than ICurrentTenantService -- this
+// middleware runs before tenant resolution validates the tenant is active, and a stable rate-limit
+// key doesn't need that validation to have already happened.
+var rateLimitingOptions = builder.Configuration.GetSection("RateLimiting").Get<RateLimitingOptions>() ?? new RateLimitingOptions();
+builder.Services.Configure<RateLimitingOptions>(builder.Configuration.GetSection("RateLimiting"));
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    if (rateLimitingOptions.Enabled)
+    {
+        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        {
+            var partitionKey = context.User.FindFirst("tenant_id")?.Value
+                ?? context.Connection.RemoteIpAddress?.ToString()
+                ?? "unknown";
+
+            return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rateLimitingOptions.PermitLimit,
+                Window = TimeSpan.FromSeconds(rateLimitingOptions.WindowSeconds),
+                QueueLimit = rateLimitingOptions.QueueLimit,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+            });
+        });
+    }
+
+    options.OnRejected = async (rejectedContext, cancellationToken) =>
+    {
+        rejectedContext.HttpContext.Response.ContentType = "application/json";
+        var response = ApiResponse.FailureResponse(
+            "Too many requests. Please try again later.",
+            StatusCodes.Status429TooManyRequests);
+        await rejectedContext.HttpContext.Response.WriteAsJsonAsync(response, cancellationToken);
+    };
+});
+builder.Services.AddScoped<OlympusCoreMultitenant.Application.Integration.IEventBus, OlympusCoreMultitenant.Api.Startup.InProcessEventBus>();
 builder.Services.AddScoped<OlympusCoreMultitenant.Api.Startup.MenuPermissionValidator>();
 builder.Services.AddScoped<OlympusCoreMultitenant.Api.Startup.ModuleSyncService>();
 builder.Services.AddScoped<OlympusCoreMultitenant.Api.Startup.TenantCoreModuleBackfillService>();
@@ -223,12 +280,13 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseTenantResolution();
 app.UseTokenValidation();
 app.UseAuthorization();
 
 
-app.MapHealthChecks("/health").WithMetadata(new OlympusCoreMultitenant.Api.Middleware.SkipTenantResolutionAttribute());
+app.MapHealthChecks("/health").WithMetadata(new OlympusCoreMultitenant.Api.Middleware.SkipTenantResolutionAttribute()).DisableRateLimiting();
 app.MapControllers();
 app.MapHub<OlympusCoreMultitenant.Api.Hubs.NotificationHub>("/hubs/notifications");
 
@@ -236,6 +294,13 @@ app.MapHub<OlympusCoreMultitenant.Api.Hubs.NotificationHub>("/hubs/notifications
 using (var scope = app.Services.CreateScope())
 {
     var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+
+    // Guards the whole migration/catalog-sync sequence below against multiple instances starting
+    // concurrently (e.g. a rolling deploy with >1 replica) -- without this, two instances can race
+    // EF migrations against the same database at once.
+    var bootLock = scope.ServiceProvider.GetRequiredService<OlympusCoreMultitenant.Application.Common.Interfaces.IDistributedBootLock>();
+    await using var bootLockHandle = await bootLock.AcquireAsync();
+
     logger.LogDebug($"Starting database bootstrapper...");
     var databaseBootstrapper = scope.ServiceProvider.GetRequiredService<IDatabaseBootstrapper>();
     await databaseBootstrapper.MigrateAsync();

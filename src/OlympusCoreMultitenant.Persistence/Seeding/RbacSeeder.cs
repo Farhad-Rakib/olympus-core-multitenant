@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using OlympusCoreMultitenant.Application.ModuleSystem;
 using OlympusCoreMultitenant.Application.Security;
 using OlympusCoreMultitenant.Domain.Entities;
 using OlympusCoreMultitenant.Domain.Enums;
@@ -11,11 +12,13 @@ public sealed class RbacSeeder : IRbacSeeder
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly ILogger<RbacSeeder> _logger;
+    private readonly IReadOnlyList<IOlympusModule> _modules;
 
-    public RbacSeeder(ApplicationDbContext dbContext, ILogger<RbacSeeder> logger)
+    public RbacSeeder(ApplicationDbContext dbContext, ILogger<RbacSeeder> logger, IReadOnlyList<IOlympusModule> modules)
     {
         _dbContext = dbContext;
         _logger = logger;
+        _modules = modules;
     }
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
@@ -35,19 +38,19 @@ public sealed class RbacSeeder : IRbacSeeder
             }
         }
 
-        foreach (var permissionName in Permissions.All)
+        foreach (var permissionDefinition in _modules.SelectMany(m => m.Permissions))
         {
-            var existingPermission = await _dbContext.Permissions.FirstOrDefaultAsync(p => p.Name == permissionName, cancellationToken);
+            var existingPermission = await _dbContext.Permissions.FirstOrDefaultAsync(p => p.Name == permissionDefinition.Name, cancellationToken);
             if (existingPermission is null)
             {
-                await _dbContext.Permissions.AddAsync(new Permission(permissionName, $"Permission for {permissionName}."), cancellationToken);
+                await _dbContext.Permissions.AddAsync(new Permission(permissionDefinition.Name, permissionDefinition.Description), cancellationToken);
             }
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         var roleNames = roles.Select(x => x.Name).ToHashSet();
-        var permissionNames = Permissions.All.ToHashSet();
+        var permissionNames = _modules.SelectMany(m => m.Permissions).Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var persistedRoles = await _dbContext.Roles.Where(r => roleNames.Contains(r.Name)).ToListAsync(cancellationToken);
         var persistedPermissions = await _dbContext.Permissions.Include(p => p.Module)

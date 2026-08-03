@@ -38,6 +38,8 @@ public static class Permissions
     public const string SystemSettingsManage = "system-settings.manage";
     public const string SubscriptionPlansManage = "subscription-plans.manage";
     public const string AuditLogsRead = "audit-logs.read";
+    public const string FeatureFlagsRead = "feature-flags.read";
+    public const string FeatureFlagsManage = "feature-flags.manage";
 
     public static readonly string[] All =
     [
@@ -76,6 +78,8 @@ public static class Permissions
         TenantsManage,
         SystemSettingsManage,
         SubscriptionPlansManage,
-        AuditLogsRead
+        AuditLogsRead,
+        FeatureFlagsRead,
+        FeatureFlagsManage
     ];
 }

@@ -8,7 +8,6 @@
   <ItemGroup>
     <ProjectReference Include="../OlympusCoreMultitenant.Application/OlympusCoreMultitenant.Application.csproj" />
     <ProjectReference Include="../OlympusCoreMultitenant.Domain/OlympusCoreMultitenant.Domain.csproj" />
-    <ProjectReference Include="../OlympusCoreMultitenant.Infrastructure/OlympusCoreMultitenant.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

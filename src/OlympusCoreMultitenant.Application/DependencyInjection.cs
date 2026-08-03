@@ -2,6 +2,9 @@ using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using OlympusCoreMultitenant.Application.Auth;
 using OlympusCoreMultitenant.Application.AuditLogs;
+using OlympusCoreMultitenant.Application.FeatureFlags;
+using OlympusCoreMultitenant.Application.Integration;
+using OlympusCoreMultitenant.Application.Licensing;
 using OlympusCoreMultitenant.Application.Menu;
 using OlympusCoreMultitenant.Application.Permissions;
 using OlympusCoreMultitenant.Application.Roles;
@@ -9,7 +12,9 @@ using OlympusCoreMultitenant.Application.SiteSettings;
 using OlympusCoreMultitenant.Application.Subscriptions;
 using OlympusCoreMultitenant.Application.SystemSettings;
 using OlympusCoreMultitenant.Application.Tenants;
+using OlympusCoreMultitenant.Application.Tenants.Events;
 using OlympusCoreMultitenant.Application.Users;
+using OlympusCoreMultitenant.Application.Users.EventHandlers;
 
 namespace OlympusCoreMultitenant.Application;
 
@@ -27,6 +32,9 @@ public static class DependencyInjection
         services.AddScoped<ITenantService, TenantService>();
         services.AddScoped<ISubscriptionPlanService, SubscriptionPlanService>();
         services.AddScoped<IAuditLogService, AuditLogService>();
+        services.AddScoped<IFeatureFlagService, FeatureFlagService>();
+        services.AddScoped<ILicenseService, LicenseService>();
+        services.AddScoped<IIntegrationEventHandler<TenantApprovedIntegrationEvent>, CreateAdminUserOnTenantApprovedHandler>();
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
 
         return services;

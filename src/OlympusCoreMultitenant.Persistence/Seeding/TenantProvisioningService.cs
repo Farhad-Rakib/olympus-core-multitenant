@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OlympusCoreMultitenant.Application.Common.Interfaces;
+using OlympusCoreMultitenant.Application.ModuleSystem;
 using OlympusCoreMultitenant.Application.Security;
 using OlympusCoreMultitenant.Domain.Entities;
 using OlympusCoreMultitenant.Domain.Enums;
@@ -12,15 +13,18 @@ public sealed class TenantProvisioningService : ITenantProvisioningService
     private readonly ApplicationDbContext _dbContext;
     private readonly ICurrentTenantService _currentTenantService;
     private readonly IRbacSeeder _rbacSeeder;
+    private readonly IReadOnlyList<IOlympusModule> _modules;
 
     public TenantProvisioningService(
         ApplicationDbContext dbContext,
         ICurrentTenantService currentTenantService,
-        IRbacSeeder rbacSeeder)
+        IRbacSeeder rbacSeeder,
+        IReadOnlyList<IOlympusModule> modules)
     {
         _dbContext = dbContext;
         _currentTenantService = currentTenantService;
         _rbacSeeder = rbacSeeder;
+        _modules = modules;
     }
 
     // Deliberately does NOT seed any user here (previously did, via the now-removed
@@ -37,7 +41,16 @@ public sealed class TenantProvisioningService : ITenantProvisioningService
         await SeedModuleEntitlementsAsync(moduleKeys, cancellationToken);
         await _rbacSeeder.SeedAsync(cancellationToken);
         await DefaultSiteSettingsSeeder.SeedAsync(_dbContext);
-        await DefaultMenuSeeder.SeedAsync(_dbContext);
+        await DefaultMenuSeeder.SeedAsync(_dbContext, _modules);
+    }
+
+    public async Task ResyncCatalogAsync(Tenant tenant, CancellationToken cancellationToken = default)
+    {
+        using var scope = _currentTenantService.BeginScope(tenant.Id, tenant.Slug);
+
+        await _rbacSeeder.SeedAsync(cancellationToken);
+        await DefaultSiteSettingsSeeder.SeedAsync(_dbContext);
+        await DefaultMenuSeeder.SeedAsync(_dbContext, _modules);
     }
 
     // Core is no longer unconditional -- it's just the module that's entitled by default when no

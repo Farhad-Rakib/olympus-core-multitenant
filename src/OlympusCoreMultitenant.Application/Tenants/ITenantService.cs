@@ -1,4 +1,5 @@
 using OlympusCoreMultitenant.Application.Tenants.Dtos;
+using OlympusCoreMultitenant.Domain.Enums;
 
 namespace OlympusCoreMultitenant.Application.Tenants;
 
@@ -19,4 +20,20 @@ public interface ITenantService
     Task SubmitRegistrationAsync(SubmitTenantRegistrationRequestDto request, CancellationToken cancellationToken = default);
     Task<PendingTenantRegistrationDto?> GetPendingRegistrationAsync(long tenantId, CancellationToken cancellationToken = default);
     Task ApproveRegistrationAsync(long tenantId, long? subscriptionPlanId = null, CancellationToken cancellationToken = default);
+    Task ReprovisionCatalogAsync(long tenantId, CancellationToken cancellationToken = default);
+    Task<TenantCatalogResyncResultDto> ReprovisionAllCatalogsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<TenantDomainDto>> GetDomainsAsync(long tenantId, CancellationToken cancellationToken = default);
+    Task<TenantDomainDto> AddDomainAsync(long tenantId, string domain, CancellationToken cancellationToken = default);
+    Task RemoveDomainAsync(long tenantId, long domainId, CancellationToken cancellationToken = default);
+    Task<TenantExportDto> ExportAsync(long tenantId, CancellationToken cancellationToken = default);
+
+    // confirmationSlug must equal the tenant's own slug -- a deliberate "type the name to confirm"
+    // gate against an accidental irreversible call. Also requires the tenant to already be disabled
+    // and past its cooling-off period; see TenantOffboardingOptions.PurgeCoolingOffDays.
+    Task PurgeAsync(long tenantId, string confirmationSlug, CancellationToken cancellationToken = default);
+    Task<LicenseStatus> GetLicenseStatusAsync(long tenantId, CancellationToken cancellationToken = default);
+    Task StartTrialAsync(long tenantId, DateTime trialEndsAtUtc, CancellationToken cancellationToken = default);
+    Task SetLicenseExpiryAsync(long tenantId, DateTime? licenseExpiresAtUtc, CancellationToken cancellationToken = default);
+    Task SuspendLicenseAsync(long tenantId, CancellationToken cancellationToken = default);
+    Task UnsuspendLicenseAsync(long tenantId, CancellationToken cancellationToken = default);
 }

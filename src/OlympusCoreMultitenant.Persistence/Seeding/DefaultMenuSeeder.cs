@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using OlympusCoreMultitenant.Application.Security;
+using OlympusCoreMultitenant.Application.ModuleSystem;
 using OlympusCoreMultitenant.Domain.Entities;
 using OlympusCoreMultitenant.Persistence.Context;
 
@@ -7,23 +7,35 @@ namespace OlympusCoreMultitenant.Persistence.Seeding
 {
     public static class DefaultMenuSeeder
     {
-        public static async Task SeedAsync(ApplicationDbContext dbContext)
+        // Two passes because a module's menu can parent under another module's menu by title (e.g.
+        // Platform's "Tenants" parents under Core's "Configuration") -- every menu must exist before
+        // any parent link is resolved, so pass order can't depend on module discovery order.
+        public static async Task SeedAsync(ApplicationDbContext dbContext, IReadOnlyList<IOlympusModule> modules)
         {
-            var dashboard = await UpsertMenuAsync(dbContext, "Dashboard", "/dashboard", "dashboard", null, null);
-            var configuration = await UpsertMenuAsync(dbContext, "Configuration", null, "settings", null, null);
+            var definitions = modules.SelectMany(m => m.Menus).ToList();
 
-            await UpsertMenuAsync(dbContext, "Users", "/users", "users", Permissions.UsersRead, configuration);
-            await UpsertMenuAsync(dbContext, "Roles", "/roles", "roles", Permissions.RolesRead, configuration);
-            await UpsertMenuAsync(dbContext, "Permissions", "/permissions", "permissions", Permissions.PermissionsRead, configuration);
-            await UpsertMenuAsync(dbContext, "User Roles", "/users/roles", "user-roles", Permissions.UserRolesRead, configuration);
-            await UpsertMenuAsync(dbContext, "Role Permissions", "/roles/permissions", "role-permissions", Permissions.RolePermissionsRead, configuration);
-            // Example additional menu: Reports (requires reports.read permission)
-            await UpsertMenuAsync(dbContext, "Reports", "/reports", "chart-bar", Permissions.ReportsRead, configuration);
-            await UpsertMenuAsync(dbContext, "Site Settings", "/site-settings", "settings", Permissions.SiteSettingsRead, configuration);
-            await UpsertMenuAsync(dbContext, "System Settings", "/system-settings", "sliders", Permissions.SystemSettingsManage, configuration);
-            await UpsertMenuAsync(dbContext, "Tenants", "/tenants", "Building2", Permissions.TenantsManage, configuration);
-            await UpsertMenuAsync(dbContext, "Subscription Plans", "/subscription-plans", "Package", Permissions.SubscriptionPlansManage, configuration);
-            await UpsertMenuAsync(dbContext, "Audit Logs", "/audit-logs", "History", Permissions.AuditLogsRead, configuration);
+            var menusByTitle = new Dictionary<string, Menu>(StringComparer.OrdinalIgnoreCase);
+            foreach (var definition in definitions)
+            {
+                menusByTitle[definition.Title] = await UpsertMenuAsync(dbContext, definition.Title, definition.Url, definition.Icon, definition.RequiredPermission);
+            }
+
+            foreach (var definition in definitions)
+            {
+                if (definition.ParentTitle is null)
+                {
+                    continue;
+                }
+
+                if (!menusByTitle.TryGetValue(definition.ParentTitle, out var parent))
+                {
+                    continue;
+                }
+
+                var menu = menusByTitle[definition.Title];
+                menu.ParentMenu = parent;
+                menu.ParentMenuId = parent.Id;
+            }
 
             await dbContext.SaveChangesAsync();
         }
@@ -33,8 +45,7 @@ namespace OlympusCoreMultitenant.Persistence.Seeding
             string title,
             string? url,
             string? icon,
-            string? requiredPermission,
-            Menu? parentMenu)
+            string? requiredPermission)
         {
             var menu = await dbContext.Menus.FirstOrDefaultAsync(existing => existing.Title == title);
             if (menu is null)
@@ -46,8 +57,6 @@ namespace OlympusCoreMultitenant.Persistence.Seeding
             menu.Url = url;
             menu.Icon = icon;
             menu.RequiredPermission = requiredPermission;
-            menu.ParentMenu = parentMenu;
-            menu.ParentMenuId = parentMenu?.Id;
 
             return menu;
         }

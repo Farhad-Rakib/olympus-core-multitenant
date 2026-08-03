@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Olympus",
+  "classifications": ["Olympus", "Module"],
+  "identity": "Olympus.Templates.Module",
+  "name": "Olympus Module",
+  "shortName": "olympus-module",
+  "sourceName": "SampleModule",
+  "preferNameDirectory": false,
+  "symbols": {
+    "keyPrefix": {
+      "type": "generated",
+      "generator": "casing",
+      "parameters": {
+        "source": "name",
+        "toLower": true
+      },
+      "replaces": "samplemodule"
+    }
+  }
+}

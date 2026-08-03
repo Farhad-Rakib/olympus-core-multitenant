@@ -101,6 +101,105 @@ public sealed class TenantsController : ControllerBase
         return Ok(ApiResponse.SuccessResponse("Registration approved and tenant activated successfully", StatusCodes.Status200OK));
     }
 
+    [HttpPost("{id:long}/resync-catalog")]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ResyncCatalog(long id, CancellationToken cancellationToken)
+    {
+        await _tenantService.ReprovisionCatalogAsync(id, cancellationToken);
+        return Ok(ApiResponse.SuccessResponse("Tenant catalog resynced successfully", StatusCodes.Status200OK));
+    }
+
+    [HttpPost("resync-catalog-all")]
+    [ProducesResponseType(typeof(ApiResponse<TenantCatalogResyncResultDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ResyncAllCatalogs(CancellationToken cancellationToken)
+    {
+        var result = await _tenantService.ReprovisionAllCatalogsAsync(cancellationToken);
+        return Ok(ApiResponse<TenantCatalogResyncResultDto>.SuccessResponse(result, $"Resynced {result.ResyncedCount} tenant(s), skipped {result.SkippedCount} unprovisioned"));
+    }
+
+    [HttpGet("{id:long}/domains")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<TenantDomainDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetDomains(long id, CancellationToken cancellationToken)
+    {
+        var domains = await _tenantService.GetDomainsAsync(id, cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<TenantDomainDto>>.SuccessResponse(domains, "Tenant domains retrieved successfully"));
+    }
+
+    [HttpPost("{id:long}/domains")]
+    [ProducesResponseType(typeof(ApiResponse<TenantDomainDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> AddDomain(long id, [FromBody] AddTenantDomainRequestDto request, CancellationToken cancellationToken)
+    {
+        var domain = await _tenantService.AddDomainAsync(id, request.Domain, cancellationToken);
+        return Ok(ApiResponse<TenantDomainDto>.SuccessResponse(domain, "Tenant domain added successfully"));
+    }
+
+    [HttpDelete("{id:long}/domains/{domainId:long}")]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> RemoveDomain(long id, long domainId, CancellationToken cancellationToken)
+    {
+        await _tenantService.RemoveDomainAsync(id, domainId, cancellationToken);
+        return Ok(ApiResponse.SuccessResponse("Tenant domain removed successfully"));
+    }
+
+    [HttpGet("{id:long}/export")]
+    [ProducesResponseType(typeof(ApiResponse<TenantExportDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Export(long id, CancellationToken cancellationToken)
+    {
+        var export = await _tenantService.ExportAsync(id, cancellationToken);
+        return Ok(ApiResponse<TenantExportDto>.SuccessResponse(export, "Tenant data exported successfully"));
+    }
+
+    // Irreversible. The tenant must already be disabled (via DELETE /tenants/{id}) and past its
+    // cooling-off period, and the caller must pass the tenant's own slug back as confirmSlug --
+    // see ITenantService.PurgeAsync.
+    [HttpDelete("{id:long}/purge")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> Purge(long id, [FromQuery] string confirmSlug, CancellationToken cancellationToken)
+    {
+        await _tenantService.PurgeAsync(id, confirmSlug, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpGet("{id:long}/license")]
+    [ProducesResponseType(typeof(ApiResponse<TenantLicenseStatusDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetLicenseStatus(long id, CancellationToken cancellationToken)
+    {
+        var status = await _tenantService.GetLicenseStatusAsync(id, cancellationToken);
+        return Ok(ApiResponse<TenantLicenseStatusDto>.SuccessResponse(new TenantLicenseStatusDto(status), "Tenant license status retrieved successfully"));
+    }
+
+    [HttpPost("{id:long}/license/trial")]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> StartTrial(long id, [FromBody] StartTrialRequestDto request, CancellationToken cancellationToken)
+    {
+        await _tenantService.StartTrialAsync(id, request.TrialEndsAtUtc, cancellationToken);
+        return Ok(ApiResponse.SuccessResponse("Trial started successfully"));
+    }
+
+    [HttpPost("{id:long}/license/expiry")]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetLicenseExpiry(long id, [FromBody] SetLicenseExpiryRequestDto request, CancellationToken cancellationToken)
+    {
+        await _tenantService.SetLicenseExpiryAsync(id, request.LicenseExpiresAtUtc, cancellationToken);
+        return Ok(ApiResponse.SuccessResponse("License expiry updated successfully"));
+    }
+
+    [HttpPost("{id:long}/license/suspend")]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SuspendLicense(long id, CancellationToken cancellationToken)
+    {
+        await _tenantService.SuspendLicenseAsync(id, cancellationToken);
+        return Ok(ApiResponse.SuccessResponse("Tenant license suspended"));
+    }
+
+    [HttpPost("{id:long}/license/unsuspend")]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UnsuspendLicense(long id, CancellationToken cancellationToken)
+    {
+        await _tenantService.UnsuspendLicenseAsync(id, cancellationToken);
+        return Ok(ApiResponse.SuccessResponse("Tenant license unsuspended"));
+    }
+
     [HttpPost("{id:long}/subscription-plan")]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]

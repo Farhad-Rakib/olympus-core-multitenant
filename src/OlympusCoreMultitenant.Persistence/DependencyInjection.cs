@@ -32,11 +32,13 @@ public static class DependencyInjection
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepository>();
         services.AddScoped<ISiteSettingRepository, SiteSettingRepository>();
+        services.AddScoped<ITenantFeatureFlagRepository, TenantFeatureFlagRepository>();
         services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<ITenantRegistrationTokenRepository, TenantRegistrationTokenRepository>();
         services.AddScoped<IModuleRepository, ModuleRepository>();
         services.AddScoped<ITenantModuleRepository, TenantModuleRepository>();
+        services.AddScoped<ITenantDomainRepository, TenantDomainRepository>();
         services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
         services.AddScoped<ISubscriptionPlanModuleRepository, SubscriptionPlanModuleRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
@@ -47,6 +49,8 @@ public static class DependencyInjection
         services.AddScoped<IDatabaseBootstrapper, EfCoreDatabaseBootstrapper>();
         services.AddScoped<IMenuRepository, MenuRepository>();
         services.AddScoped<Application.Common.Interfaces.ITenantProvisioningService, TenantProvisioningService>();
+        services.AddScoped<Application.Common.Interfaces.IDistributedBootLock, Concurrency.PostgresAdvisoryBootLock>();
+        services.AddScoped<Application.Common.Interfaces.ITenantOffboardingService, Offboarding.TenantOffboardingService>();
 
         return services;
     }
