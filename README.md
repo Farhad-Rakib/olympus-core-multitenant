@@ -6,11 +6,11 @@ A production-oriented, multi-tenant Clean Architecture Web API built on .NET 8 �
 
 ```
 src/
-  OlympusCoreMultitenant.Api             HTTP endpoints, middleware, Swagger, SignalR, auth wiring, startup bootstrap
-  OlympusCoreMultitenant.Application     Use-case services, DTOs, FluentValidation validators
-  OlympusCoreMultitenant.Infrastructure  JWT, password hashing, email, other external integrations
-  OlympusCoreMultitenant.Persistence     EF Core DbContext, repositories, seeding, migrations
-  OlympusCoreMultitenant.Domain          Entities, enums, common models, value objects
+  ProjectNamePlaceholder.Api             HTTP endpoints, middleware, Swagger, SignalR, auth wiring, startup bootstrap
+  ProjectNamePlaceholder.Application     Use-case services, DTOs, FluentValidation validators
+  ProjectNamePlaceholder.Infrastructure  JWT, password hashing, email, other external integrations
+  ProjectNamePlaceholder.Persistence     EF Core DbContext, repositories, seeding, migrations
+  ProjectNamePlaceholder.Domain          Entities, enums, common models, value objects
 ```
 
 Layered dependency direction: `Api → Application → Domain`, with `Infrastructure` and `Persistence` implementing interfaces defined in `Application`/`Domain`.
@@ -76,7 +76,7 @@ dotnet --version
 
 **Configure**
 
-Edit `src/OlympusCoreMultitenant.Api/appsettings.json` (or an environment-specific override / environment variables):
+Edit `src/ProjectNamePlaceholder.Api/appsettings.json` (or an environment-specific override / environment variables):
 
 - `Database:Provider` — `postgres` or `sqlserver`
 - `ConnectionStrings:PostgresConnection` / `ConnectionStrings:SqlServerConnection`
@@ -91,7 +91,7 @@ Edit `src/OlympusCoreMultitenant.Api/appsettings.json` (or an environment-specif
 ```sh
 dotnet restore
 dotnet build
-dotnet run --project src/OlympusCoreMultitenant.Api
+dotnet run --project src/ProjectNamePlaceholder.Api
 ```
 
 On first run against a fresh database, the app applies EF Core migrations and provisions the `"default"` tenant automatically — including a default SuperAdmin user (see [Default User and Site Settings](#default-user-and-site-settings)). Swagger UI is available in development mode.
@@ -161,8 +161,8 @@ Global (not per-tenant) **system settings** — e.g. `Auth:EmailUniquenessScope`
 On startup the API: applies pending EF Core migrations, seeds global system settings, ensures the `"default"` tenant exists, and runs full provisioning for it. All seeders are idempotent (check-then-insert), so re-running them — including re-provisioning an existing tenant — is safe and additive-only (it will never remove a grant you've since customized).
 
 ```sh
-dotnet ef migrations add <Name> --project src/OlympusCoreMultitenant.Persistence --startup-project src/OlympusCoreMultitenant.Api
-dotnet ef database update --project src/OlympusCoreMultitenant.Persistence --startup-project src/OlympusCoreMultitenant.Api
+dotnet ef migrations add <Name> --project src/ProjectNamePlaceholder.Persistence --startup-project src/ProjectNamePlaceholder.Api
+dotnet ef database update --project src/ProjectNamePlaceholder.Persistence --startup-project src/ProjectNamePlaceholder.Api
 ```
 
 ## Further Reading

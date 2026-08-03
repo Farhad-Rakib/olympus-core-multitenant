@@ -1,4 +1,4 @@
-# GitLab CI/CD Pipeline for OlympusCoreMultitenant
+# GitLab CI/CD Pipeline for ProjectNamePlaceholder
 # Supports: Development, Staging, Production
 
 variables:
@@ -27,8 +27,8 @@ build:
   variables:
     BUILD_CONFIGURATION: "Release"
   script:
-    - echo "Building OlympusCoreMultitenant..."
-    - cd OlympusCoreMultitenant.Api
+    - echo "Building ProjectNamePlaceholder..."
+    - cd ProjectNamePlaceholder.Api
     - dotnet build -c ${BUILD_CONFIGURATION}
     - dotnet publish -c ${BUILD_CONFIGURATION} -o ../publish
   artifacts:

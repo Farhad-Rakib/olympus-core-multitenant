@@ -1,6 +1,6 @@
 # CI/CD Configuration Guide
 
-This document explains the GitLab CI/CD pipeline setup for OlympusCoreMultitenant with Docker support across Development, Staging, and Production environments.
+This document explains the GitLab CI/CD pipeline setup for ProjectNamePlaceholder with Docker support across Development, Staging, and Production environments.
 
 ## Overview
 

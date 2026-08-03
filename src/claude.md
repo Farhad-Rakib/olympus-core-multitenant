@@ -2,13 +2,13 @@
 
 ## Project Snapshot
 
-This repository is a layered ASP.NET Core API built around `OlympusCoreMultitenant` namespaces.
+This repository is a layered ASP.NET Core API built around `ProjectNamePlaceholder` namespaces.
 
-- `OlympusCoreMultitenant.Api` hosts HTTP endpoints, middleware, Swagger, SignalR, auth, caching, and startup bootstrap.
-- `OlympusCoreMultitenant.Application` contains use-case services and FluentValidation validators.
-- `OlympusCoreMultitenant.Infrastructure` contains JWT, password hashing, email, and other external integrations.
-- `OlympusCoreMultitenant.Persistence` contains the database context, repositories, seeding, and database bootstrap logic.
-- `OlympusCoreMultitenant.Domain` contains entities, enums, common models, and value objects.
+- `ProjectNamePlaceholder.Api` hosts HTTP endpoints, middleware, Swagger, SignalR, auth, caching, and startup bootstrap.
+- `ProjectNamePlaceholder.Application` contains use-case services and FluentValidation validators.
+- `ProjectNamePlaceholder.Infrastructure` contains JWT, password hashing, email, and other external integrations.
+- `ProjectNamePlaceholder.Persistence` contains the database context, repositories, seeding, and database bootstrap logic.
+- `ProjectNamePlaceholder.Domain` contains entities, enums, common models, and value objects.
 
 ## Runtime And Composition
 

@@ -4,7 +4,7 @@ This project uses a permission-based authorization model with role support.
 
 Key concepts
 
-- Permissions: Named constants defined in `OlympusCoreMultitenant.Application.Security.Permissions` (e.g., `site-settings.read`, `menus.create`). Policies are registered for these permissions at startup.
+- Permissions: Named constants defined in `ProjectNamePlaceholder.Application.Security.Permissions` (e.g., `site-settings.read`, `menus.create`). Policies are registered for these permissions at startup.
 - Claims: When a user authenticates, their JWT includes a `permission` claim for each allowed permission.
 - Policy enforcement: `PermissionRequirement` and `PermissionAuthorizationHandler` check the user's `permission` claims against the required permission for an endpoint.
 - Self-or-permission: `SelfOrPermissionRequirement` allows users to act on their own resources or, with permission, on others.
@@ -18,10 +18,10 @@ Assigning permissions
 
 Where to look in the code
 
-- Permission constants: [OlympusCoreMultitenant.Application/Security/Permissions.cs](OlympusCoreMultitenant.Application/Security/Permissions.cs)
-- Authorization handlers: [OlympusCoreMultitenant.Api/Authorization/PermissionAuthorizationHandler.cs](OlympusCoreMultitenant.Api/Authorization/PermissionAuthorizationHandler.cs)
-- Menu validator: [OlympusCoreMultitenant.Api/Startup/MenuPermissionValidator.cs](OlympusCoreMultitenant.Api/Startup/MenuPermissionValidator.cs)
-- Seeder bootstrap: [OlympusCoreMultitenant.Persistence/Seeding/DefaultSiteSettingsSeeder.cs](OlympusCoreMultitenant.Persistence/Seeding/DefaultSiteSettingsSeeder.cs)
+- Permission constants: [ProjectNamePlaceholder.Application/Security/Permissions.cs](ProjectNamePlaceholder.Application/Security/Permissions.cs)
+- Authorization handlers: [ProjectNamePlaceholder.Api/Authorization/PermissionAuthorizationHandler.cs](ProjectNamePlaceholder.Api/Authorization/PermissionAuthorizationHandler.cs)
+- Menu validator: [ProjectNamePlaceholder.Api/Startup/MenuPermissionValidator.cs](ProjectNamePlaceholder.Api/Startup/MenuPermissionValidator.cs)
+- Seeder bootstrap: [ProjectNamePlaceholder.Persistence/Seeding/DefaultSiteSettingsSeeder.cs](ProjectNamePlaceholder.Persistence/Seeding/DefaultSiteSettingsSeeder.cs)
 
 Behavior notes
 

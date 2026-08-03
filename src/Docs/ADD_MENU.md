@@ -6,14 +6,14 @@ Follow these steps to add a new menu item and protect it with a permission.
 - Pick a permission string (e.g. `reports.read`).
 
 2) Register the permission
-- Open `OlympusCoreMultitenant.Application/Security/Permissions.cs` and add a constant (e.g. `public const string ReportsRead = "reports.read";`) and add it to the `All` array. The application automatically registers policies from the `All` array at startup.
+- Open `ProjectNamePlaceholder.Application/Security/Permissions.cs` and add a constant (e.g. `public const string ReportsRead = "reports.read";`) and add it to the `All` array. The application automatically registers policies from the `All` array at startup.
 
 3) Grant the permission to roles
-- Update `OlympusCoreMultitenant.Persistence/Seeding/RbacSeeder.cs` (or the Dapper seeder) to grant the new permission to appropriate roles (for example `SuperAdmin` already receives all permissions). Re-run the seeder or restart the app so the permission is present in the DB.
+- Update `ProjectNamePlaceholder.Persistence/Seeding/RbacSeeder.cs` (or the Dapper seeder) to grant the new permission to appropriate roles (for example `SuperAdmin` already receives all permissions). Re-run the seeder or restart the app so the permission is present in the DB.
 
 4) Add the menu entry
 - Option A: Database seeder (recommended for initial/default menus)
-  - Edit `OlympusCoreMultitenant.Persistence/Seeding/DefaultMenuSeeder.cs` and add a new `Menu` with `RequiredPermission` set to the permission string (e.g. `reports.read`).
+  - Edit `ProjectNamePlaceholder.Persistence/Seeding/DefaultMenuSeeder.cs` and add a new `Menu` with `RequiredPermission` set to the permission string (e.g. `reports.read`).
   - The seeder is idempotent and will upsert the menu on startup.
 
 - Option B: Admin API (runtime)

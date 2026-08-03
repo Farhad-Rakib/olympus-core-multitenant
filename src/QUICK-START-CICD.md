@@ -1,6 +1,6 @@
 # GitLab CI/CD Pipeline - Quick Start Guide
 
-Complete CI/CD pipeline for OlympusCoreMultitenant with Docker support across Development, Staging, and Production environments.
+Complete CI/CD pipeline for ProjectNamePlaceholder with Docker support across Development, Staging, and Production environments.
 
 ## What Was Created
 

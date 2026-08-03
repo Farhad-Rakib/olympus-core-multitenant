@@ -8,6 +8,13 @@
   "sourceName": "SampleModule",
   "preferNameDirectory": false,
   "symbols": {
+    "rootNamespace": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "ProjectNamePlaceholder",
+      "replaces": "ProjectNamePlaceholder",
+      "description": "Root namespace of the solution you're scaffolding into (e.g. MyErpApp, matching whatever -n you gave `dotnet new olympus-multi`). Defaults to ProjectNamePlaceholder, which is only correct if you're working directly in the un-renamed template repo -- override it for any real generated solution."
+    },
     "keyPrefix": {
       "type": "generated",
       "generator": "casing",

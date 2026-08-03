@@ -8,7 +8,7 @@ obj/
 *.nupkg
 TestResults/
 .DS_Store
-src/OlympusCoreMultitenant.Api/logs/
+src/ProjectNamePlaceholder.Api/logs/
 
 # Prompt files
 INITIAL_TEMPLATE_PROMPT.md

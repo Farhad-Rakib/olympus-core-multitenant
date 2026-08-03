@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Olympus",
+  "classifications": [
+    "Web",
+    "WebAPI",
+    "Multi-tenant",
+    "Clean Architecture",
+    "EF Core",
+    "PostgreSQL",
+    "JWT",
+    "RBAC"
+  ],
+  "identity": "Olympus.MultiTenant.CleanArchitecture.WebApi",
+  "name": "Olympus Multi-Tenant Platform Solution",
+  "shortName": "olympus-multi",
+  "sourceName": "ProjectNamePlaceholder",
+  "preferNameDirectory": true,
+  "primaryOutputs": [
+    {
+      "path": "ProjectNamePlaceholder.sln"
+    }
+  ],
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "exclude": [
+            "**/bin/**",
+            "**/obj/**",
+            "**/*.user",
+            "templates/**",
+            ".template.config/**",
+            "TASKS.md"
+          ]
+        }
+      ]
+    }
+  ],
+  "symbols": {
+    "cache": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "memory",
+      "description": "Distributed cache backend. Both are real, working implementations -- everything else in the requirements this template was originally asked to support (--database mssql, --orm dapper, --auth beyond jwt, --messagebroker, --jobs, --frontend) has exactly one real implementation today (postgres/EF/JWT/controllers), so isn't exposed as a template choice yet. See templates/GUIDE.md for the reasoning, and olympus-core (a sibling template) for what a real --database/--orm choice looks like once there's a second real implementation to switch between.",
+      "choices": [
+        {
+          "choice": "memory",
+          "description": "In-memory distributed cache (single instance only)"
+        },
+        {
+          "choice": "redis",
+          "description": "Redis-backed distributed cache"
+        }
+      ]
+    },
+    "UseRedis": {
+      "type": "generated",
+      "generator": "switch",
+      "replaces": "USE_REDIS_TOKEN",
+      "parameters": {
+        "evaluator": "C++",
+        "datatype": "bool",
+        "cases": [
+          { "condition": "(cache == \"redis\")", "value": "true" },
+          { "condition": "(cache != \"redis\")", "value": "false" }
+        ]
+      }
+    }
+  },
+  "postActions": [
+    {
+      "description": "Restore NuGet packages",
+      "manualInstructions": [
+        {
+          "text": "Run 'dotnet restore' from the src/ directory"
+        }
+      ],
+      "actionId": "210D431B-A78B-4D2F-B762-4ED3E3EA9025",
+      "continueOnError": true
+    }
+  ]
+}

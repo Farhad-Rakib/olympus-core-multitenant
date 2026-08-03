@@ -1,12 +1,12 @@
-using OlympusCoreMultitenant.Application.ModuleSystem;
-using OlympusCoreMultitenant.Domain.Enums;
+using ProjectNamePlaceholder.Application.ModuleSystem;
+using ProjectNamePlaceholder.Domain.Enums;
 
-namespace OlympusCoreMultitenant.BusinessModules.SampleModule;
+namespace ProjectNamePlaceholder.BusinessModules.SampleModule;
 
-// Namespace is BusinessModules, not Modules, deliberately: OlympusCoreMultitenant.Application
+// Namespace is BusinessModules, not Modules, deliberately: ProjectNamePlaceholder.Application
 // .Security.Modules is a pre-existing static class, and C#'s enclosing-namespace lookup makes any
 // namespace literally named "Modules" ambiguous with it from files that also
-// `using OlympusCoreMultitenant.Application.Security;`. The folder is still called Modules/ to
+// `using ProjectNamePlaceholder.Application.Security;`. The folder is still called Modules/ to
 // match the framework's own vocabulary -- only the C# namespace differs.
 //
 // Scaffolded by `dotnet new olympus-module`. Implementing IOlympusModule is the only step

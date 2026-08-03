@@ -34,8 +34,8 @@ Recommended pattern:
 
 PBAC in this project is implemented with named permission policies.
 
-- Add the permission constant in [Permissions.cs](OlympusCoreMultitenant.Application/Security/Permissions.cs).
-- Register the policy during startup in [Program.cs](OlympusCoreMultitenant.Api/Program.cs).
+- Add the permission constant in [Permissions.cs](ProjectNamePlaceholder.Application/Security/Permissions.cs).
+- Register the policy during startup in [Program.cs](ProjectNamePlaceholder.Api/Program.cs).
 - Protect controller actions with `[Authorize(Policy = Permissions.SomePermission)]`.
 - Sync permissions into the database so the menu and role assignment screens can reference them.
 
@@ -62,7 +62,7 @@ Menu rules:
 
 ## Adding a new protected menu item
 
-1. Add the permission constant to [Permissions.cs](OlympusCoreMultitenant.Application/Security/Permissions.cs).
+1. Add the permission constant to [Permissions.cs](ProjectNamePlaceholder.Application/Security/Permissions.cs).
 2. Add the policy usage on the target API endpoint.
 3. Seed or create the menu item with `RequiredPermission` set to that permission string.
 4. Ensure the permission is assigned to the correct roles.
@@ -101,8 +101,8 @@ Menu, role, permission, and site settings data may be cached through `IDistribut
 
 ## Implementation references
 
-- Permission constants: [OlympusCoreMultitenant.Application/Security/Permissions.cs](OlympusCoreMultitenant.Application/Security/Permissions.cs)
-- Menu service: [OlympusCoreMultitenant.Application/Menu/MenuService.cs](OlympusCoreMultitenant.Application/Menu/MenuService.cs)
-- Menu controller: [OlympusCoreMultitenant.Api/Controllers/MenuController.cs](OlympusCoreMultitenant.Api/Controllers/MenuController.cs)
-- Menu validator: [OlympusCoreMultitenant.Api/Startup/MenuPermissionValidator.cs](OlympusCoreMultitenant.Api/Startup/MenuPermissionValidator.cs)
-- Default menu seeder: [OlympusCoreMultitenant.Persistence/Seeding/DefaultMenuSeeder.cs](OlympusCoreMultitenant.Persistence/Seeding/DefaultMenuSeeder.cs)
+- Permission constants: [ProjectNamePlaceholder.Application/Security/Permissions.cs](ProjectNamePlaceholder.Application/Security/Permissions.cs)
+- Menu service: [ProjectNamePlaceholder.Application/Menu/MenuService.cs](ProjectNamePlaceholder.Application/Menu/MenuService.cs)
+- Menu controller: [ProjectNamePlaceholder.Api/Controllers/MenuController.cs](ProjectNamePlaceholder.Api/Controllers/MenuController.cs)
+- Menu validator: [ProjectNamePlaceholder.Api/Startup/MenuPermissionValidator.cs](ProjectNamePlaceholder.Api/Startup/MenuPermissionValidator.cs)
+- Default menu seeder: [ProjectNamePlaceholder.Persistence/Seeding/DefaultMenuSeeder.cs](ProjectNamePlaceholder.Persistence/Seeding/DefaultMenuSeeder.cs)

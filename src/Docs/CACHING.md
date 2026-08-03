@@ -13,7 +13,7 @@ Enable Redis
 1. Add the package to your API project (replace with the version you prefer):
 
 ```bash
-dotnet add OlympusCoreMultitenant.Api package Microsoft.Extensions.Caching.StackExchangeRedis
+dotnet add ProjectNamePlaceholder.Api package Microsoft.Extensions.Caching.StackExchangeRedis
 ```
 
 2. In `Program.cs`, replace the in-memory registration with Redis registration:

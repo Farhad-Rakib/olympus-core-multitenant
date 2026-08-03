@@ -11,7 +11,7 @@ COLORS_GREEN='\033[0;32m'
 COLORS_YELLOW='\033[1;33m'
 COLORS_NC='\033[0m' # No Color
 
-echo -e "${COLORS_YELLOW}OlympusCoreMultitenant - Deployment Configuration${COLORS_NC}"
+echo -e "${COLORS_YELLOW}ProjectNamePlaceholder - Deployment Configuration${COLORS_NC}"
 echo "=================================================="
 echo ""
 

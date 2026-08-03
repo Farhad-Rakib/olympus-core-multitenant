@@ -7,14 +7,14 @@ Checked repositories:
 
 ## Backend Findings
 
-1. Hardcoded secrets and credentials are committed in [OlympusCoreMultitenant.Api/appsettings.json](OlympusCoreMultitenant.Api/appsettings.json#L8).
+1. Hardcoded secrets and credentials are committed in [ProjectNamePlaceholder.Api/appsettings.json](ProjectNamePlaceholder.Api/appsettings.json#L8).
    - `PostgresConnection` uses `Username=postgres;Password=postgres`.
    - `SqlServerConnection` uses `User Id=sa;Password=YourStrong@Passw0rd`.
    - `Jwt:SecretKey` is a placeholder string instead of a real secret.
    - `Smtp:Password` is also stored in plain text.
    - Risk: accidental deployment with known credentials, easy credential reuse, and exposed JWT signing keys.
 
-2. Host and environment defaults are too permissive in [OlympusCoreMultitenant.Api/appsettings.json](OlympusCoreMultitenant.Api/appsettings.json#L53).
+2. Host and environment defaults are too permissive in [ProjectNamePlaceholder.Api/appsettings.json](ProjectNamePlaceholder.Api/appsettings.json#L53).
    - `AllowedHosts` is set to `*`.
    - Risk: if the same configuration is used outside local development, the API will accept any host header.
 

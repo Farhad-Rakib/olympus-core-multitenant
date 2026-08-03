@@ -1,6 +1,6 @@
 using FluentValidation;
 
-namespace OlympusCoreMultitenant.BusinessModules.SamplePlaceholderModule.Features.SampleFeature;
+namespace ProjectNamePlaceholder.BusinessModules.SamplePlaceholderModule.Features.SampleFeature;
 
 public sealed class SampleFeatureRequestValidator : AbstractValidator<SampleFeatureRequest>
 {

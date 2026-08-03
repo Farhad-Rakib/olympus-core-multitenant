@@ -1,6 +1,6 @@
-using OlympusCoreMultitenant.Application.Integration;
+using ProjectNamePlaceholder.Application.Integration;
 
-namespace OlympusCoreMultitenant.BusinessModules.SamplePlaceholderModule.Features.SampleFeature;
+namespace ProjectNamePlaceholder.BusinessModules.SamplePlaceholderModule.Features.SampleFeature;
 
 // TODO: inject whatever repository/service this feature actually needs, and replace the body
 // below with real persistence. Resolved directly via DI at the controller action (no command

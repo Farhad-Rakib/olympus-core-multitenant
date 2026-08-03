@@ -14,7 +14,7 @@ starts. Nothing else needs editing: not `Program.cs`, not `Permissions.cs`, not 
 
 1. Rename the placeholder permission keys (`samplemodule.read`, etc.) and menu entry to match what
    this module actually does.
-2. Add entities to `OlympusCoreMultitenant.Domain.Entities` (or wherever your project's entities
+2. Add entities to `ProjectNamePlaceholder.Domain.Entities` (or wherever your project's entities
    live) implementing `ITenantEntity` if they're per-tenant data.
 3. Add a repository interface + EF configuration + repository implementation in the Persistence
    project, following an existing module's shape (e.g. `TenantFeatureFlagRepository` is a small,

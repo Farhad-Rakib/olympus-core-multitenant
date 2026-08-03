@@ -1,6 +1,6 @@
 # CI/CD Implementation Checklist
 
-Complete checklist for setting up the GitLab CI/CD pipeline for OlympusCoreMultitenant.
+Complete checklist for setting up the GitLab CI/CD pipeline for ProjectNamePlaceholder.
 
 ## Pre-Implementation
 
@@ -26,8 +26,8 @@ Complete checklist for setting up the GitLab CI/CD pipeline for OlympusCoreMulti
 
 ## Phase 2: Configuration Files (15 minutes)
 
-- [ ] Copy `appsettings.Staging.json` to `OlympusCoreMultitenant.Api/`
-- [ ] Copy `appsettings.Production.json` to `OlympusCoreMultitenant.Api/`
+- [ ] Copy `appsettings.Staging.json` to `ProjectNamePlaceholder.Api/`
+- [ ] Copy `appsettings.Production.json` to `ProjectNamePlaceholder.Api/`
 - [ ] Verify appsettings files use environment variables
 - [ ] Test local build with `dotnet build`
 - [ ] Test local publish with `dotnet publish`

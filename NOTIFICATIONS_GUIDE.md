@@ -33,7 +33,7 @@ The notification system provides real-time communication between the backend and
 ### 1. Notification Entity
 
 ```csharp
-// Location: OlympusCoreMultitenant.Domain/Entities/Notification.cs
+// Location: ProjectNamePlaceholder.Domain/Entities/Notification.cs
 public sealed class Notification : BaseEntity
 {
     public long UserId { get; set; }
@@ -55,7 +55,7 @@ public sealed class Notification : BaseEntity
 ### 2. Notification Service
 
 ```csharp
-// Location: OlympusCoreMultitenant.Application/Notifications/INotificationService.cs
+// Location: ProjectNamePlaceholder.Application/Notifications/INotificationService.cs
 public interface INotificationService
 {
     Task<IReadOnlyList<NotificationDto>> GetNotificationsAsync(long userId, CancellationToken cancellationToken = default);
@@ -115,10 +115,10 @@ public async Task UpdateProfileAsync(long userId, UpdateProfileRequestDto reques
 ### 4. NotificationHub (SignalR)
 
 ```csharp
-// Location: OlympusCoreMultitenant.Api/Hubs/NotificationHub.cs
+// Location: ProjectNamePlaceholder.Api/Hubs/NotificationHub.cs
 using Microsoft.AspNetCore.SignalR;
 
-namespace OlympusCoreMultitenant.Api.Hubs;
+namespace ProjectNamePlaceholder.Api.Hubs;
 
 public class NotificationHub : Hub
 {
@@ -687,9 +687,9 @@ public void ScheduleNotification(long userId, string message, DateTime scheduleT
 
 ## Files Reference
 
-- **Backend Models:** `/OlympusCoreMultitenant.Domain/Entities/Notification.cs`
-- **Service Interface:** `/OlympusCoreMultitenant.Application/Notifications/INotificationService.cs`
-- **SignalR Hub:** `/OlympusCoreMultitenant.Api/Hubs/NotificationHub.cs`
-- **Entity Configuration:** `/OlympusCoreMultitenant.Persistence/Configurations/NotificationConfiguration.cs`
-- **Migration:** `/OlympusCoreMultitenant.Persistence/Migrations/20260514123906_AddNotificationTable.cs`
+- **Backend Models:** `/ProjectNamePlaceholder.Domain/Entities/Notification.cs`
+- **Service Interface:** `/ProjectNamePlaceholder.Application/Notifications/INotificationService.cs`
+- **SignalR Hub:** `/ProjectNamePlaceholder.Api/Hubs/NotificationHub.cs`
+- **Entity Configuration:** `/ProjectNamePlaceholder.Persistence/Configurations/NotificationConfiguration.cs`
+- **Migration:** `/ProjectNamePlaceholder.Persistence/Migrations/20260514123906_AddNotificationTable.cs`
 

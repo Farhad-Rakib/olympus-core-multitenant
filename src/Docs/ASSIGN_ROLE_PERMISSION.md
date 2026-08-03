@@ -68,10 +68,10 @@ Now user `789` will receive claims for the role's permissions when they authenti
 - If you prefer referential integrity: store `PermissionId` on `Menu` and join at render-time; you'll need to map permission rows to strings for claim checks.
 
 **Files to inspect**
-- Role endpoints: [OlympusCoreMultitenant.Api/Controllers/RoleController.cs](OlympusCoreMultitenant.Api/Controllers/RoleController.cs#L1)
-- User role endpoints: [OlympusCoreMultitenant.Api/Controllers/UsersController.cs](OlympusCoreMultitenant.Api/Controllers/UsersController.cs#L1)
-- Menu service/filtering: [OlympusCoreMultitenant.Application/Menu/MenuService.cs](OlympusCoreMultitenant.Application/Menu/MenuService.cs#L1)
-- Permission constants: [OlympusCoreMultitenant.Application/Security/Permissions.cs](OlympusCoreMultitenant.Application/Security/Permissions.cs#L1)
+- Role endpoints: [ProjectNamePlaceholder.Api/Controllers/RoleController.cs](ProjectNamePlaceholder.Api/Controllers/RoleController.cs#L1)
+- User role endpoints: [ProjectNamePlaceholder.Api/Controllers/UsersController.cs](ProjectNamePlaceholder.Api/Controllers/UsersController.cs#L1)
+- Menu service/filtering: [ProjectNamePlaceholder.Application/Menu/MenuService.cs](ProjectNamePlaceholder.Application/Menu/MenuService.cs#L1)
+- Permission constants: [ProjectNamePlaceholder.Application/Security/Permissions.cs](ProjectNamePlaceholder.Application/Security/Permissions.cs#L1)
 
 If you want, I can add:
 - a) an initial seeder entry that grants `reports.read` to a specific role in `RbacSeeder.cs`, or
