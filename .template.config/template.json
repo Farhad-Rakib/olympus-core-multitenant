@@ -8,6 +8,7 @@
     "Clean Architecture",
     "EF Core",
     "PostgreSQL",
+    "SQL Server",
     "JWT",
     "RBAC"
   ],
@@ -33,16 +34,47 @@
             ".template.config/**",
             "TASKS.md"
           ]
+        },
+        {
+          "condition": "(database == \"sqlserver\")",
+          "exclude": [
+            "**/Concurrency/PostgresAdvisoryBootLock.cs",
+            "**/Migrations/Postgres/**"
+          ]
+        },
+        {
+          "condition": "(database == \"postgres\")",
+          "exclude": [
+            "**/Concurrency/SqlServerAdvisoryBootLock.cs",
+            "**/Migrations/SqlServer/**"
+          ]
         }
       ]
     }
   ],
   "symbols": {
+    "database": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "postgres",
+      "description": "Database provider. Both are real, working implementations -- picking one excludes the other provider's package references, DI wiring, boot-lock implementation, and EF Core migrations entirely, so the generated solution never carries dead provider code. Everything else this template was originally asked to support (--orm dapper, --auth beyond jwt, --jobs, --frontend) still has exactly one real implementation today, so isn't exposed as a choice yet -- see templates/GUIDE.md.",
+      "replaces": "DB_PROVIDER_TOKEN",
+      "choices": [
+        {
+          "choice": "postgres",
+          "description": "PostgreSQL via Npgsql.EntityFrameworkCore.PostgreSQL"
+        },
+        {
+          "choice": "sqlserver",
+          "description": "SQL Server via Microsoft.EntityFrameworkCore.SqlServer"
+        }
+      ]
+    },
     "cache": {
       "type": "parameter",
       "datatype": "choice",
       "defaultValue": "memory",
-      "description": "Distributed cache backend. Both are real, working implementations -- everything else in the requirements this template was originally asked to support (--database mssql, --orm dapper, --auth beyond jwt, --messagebroker, --jobs, --frontend) has exactly one real implementation today (postgres/EF/JWT/controllers), so isn't exposed as a template choice yet. See templates/GUIDE.md for the reasoning, and olympus-core (a sibling template) for what a real --database/--orm choice looks like once there's a second real implementation to switch between.",
+      "description": "Distributed cache backend. Both are real, working implementations.",
       "choices": [
         {
           "choice": "memory",

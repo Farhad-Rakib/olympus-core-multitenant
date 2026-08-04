@@ -16,14 +16,18 @@ public static class DependencyInjection
         services.AddDbContext<ApplicationDbContext>(options =>
         {
             var provider = GetProvider(configuration);
+            //#if (database == "postgres")
             if (provider == "postgres")
             {
                 options.UseNpgsql(GetConnectionString(configuration, "PostgresConnection"));
             }
-            else
+            //#endif
+            //#if (database == "sqlserver")
+            if (provider == "sqlserver")
             {
-                throw new InvalidOperationException($"Unsupported database provider '{provider}'. Supported values: postgres, sqlserver.");
+                options.UseSqlServer(GetConnectionString(configuration, "SqlServerConnection"));
             }
+            //#endif
         });
 
         services.AddScoped<IUserRepository, UserRepository>();
@@ -49,21 +53,31 @@ public static class DependencyInjection
         services.AddScoped<IDatabaseBootstrapper, EfCoreDatabaseBootstrapper>();
         services.AddScoped<IMenuRepository, MenuRepository>();
         services.AddScoped<Application.Common.Interfaces.ITenantProvisioningService, TenantProvisioningService>();
-        services.AddScoped<Application.Common.Interfaces.IDistributedBootLock, Concurrency.PostgresAdvisoryBootLock>();
+        //#if (database == "postgres")
+        if (GetProvider(configuration) == "postgres")
+        {
+            services.AddScoped<Application.Common.Interfaces.IDistributedBootLock, Concurrency.PostgresAdvisoryBootLock>();
+        }
+        //#endif
+        //#if (database == "sqlserver")
+        if (GetProvider(configuration) == "sqlserver")
+        {
+            services.AddScoped<Application.Common.Interfaces.IDistributedBootLock, Concurrency.SqlServerAdvisoryBootLock>();
+        }
+        //#endif
         services.AddScoped<Application.Common.Interfaces.ITenantOffboardingService, Offboarding.TenantOffboardingService>();
 
         return services;
     }
 
+    // Falls back to postgres for anything unrecognized rather than throwing: a `dotnet new`-generated
+    // solution always has this resolved to a real value by the `database` template parameter, so the
+    // fallback only matters when running the raw, un-generated template repo directly (where
+    // Database:Provider's value is a template substitution token until `dotnet new` resolves it).
     private static string GetProvider(IConfiguration configuration)
     {
         var provider = (configuration["Database:Provider"] ?? "postgres").ToLowerInvariant();
-        if (provider is not ("postgres" or "sqlserver"))
-        {
-            throw new InvalidOperationException($"Unsupported database provider '{provider}'. Supported values: postgres, sqlserver.");
-        }
-
-        return provider;
+        return provider is "postgres" or "sqlserver" ? provider : "postgres";
     }
 
     private static string GetConnectionString(IConfiguration configuration, string key)

@@ -18,7 +18,7 @@ This repository is a layered ASP.NET Core API built around `ProjectNamePlacehold
 - The API exposes Swagger in development and enables SignalR notifications.
 - CORS allows `http://localhost:5173` in development.
 - Caching can use Redis when `Caching:UseRedis` is enabled; otherwise memory cache is used.
-- Database provider is selected with `Database:Provider` and supports `postgres` or `sqlserver`.
+- Database provider is `postgres` or `sqlserver`, fixed at `dotnet new olympus-multi --database <postgres|sqlserver>` generation time (only the chosen provider's packages, DI wiring, boot-lock implementation, and migrations ship — see `templates/GUIDE.md`). `Database:Provider` in `appsettings.json` reflects that choice; the raw, un-generated template repo itself only compiles Postgres migrations (`Persistence/Migrations/Postgres/`) — SQL Server migrations exist only in a `--database sqlserver`-generated solution's own `Persistence/Migrations/SqlServer/`.
 - Startup performs database bootstrap, menu-permission validation, and permission sync.
 
 ## Important Configuration Keys
