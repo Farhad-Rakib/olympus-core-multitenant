@@ -252,7 +252,18 @@ builder.Services.AddRateLimiter(options =>
         await rejectedContext.HttpContext.Response.WriteAsJsonAsync(response, cancellationToken);
     };
 });
-builder.Services.AddScoped<ProjectNamePlaceholder.Application.Integration.IEventBus, ProjectNamePlaceholder.Api.Startup.InProcessEventBus>();
+// Integration Hub: RabbitMQ-backed IEventBus if configured, in-process (same-transaction, no delivery
+// guarantees) otherwise -- see Integration/IEventBus.cs and templates/GUIDE.md §8.
+var useRabbitMq = builder.Configuration.GetSection("Integration").GetValue<bool>("UseRabbitMq", false);
+if (useRabbitMq)
+{
+    builder.Services.AddSingleton<ProjectNamePlaceholder.Application.Integration.IEventBus, ProjectNamePlaceholder.Infrastructure.Messaging.RabbitMqEventBus>();
+    builder.Services.AddHostedService<ProjectNamePlaceholder.Infrastructure.Messaging.RabbitMqEventConsumer>();
+}
+else
+{
+    builder.Services.AddScoped<ProjectNamePlaceholder.Application.Integration.IEventBus, ProjectNamePlaceholder.Api.Startup.InProcessEventBus>();
+}
 builder.Services.AddScoped<ProjectNamePlaceholder.Api.Startup.MenuPermissionValidator>();
 builder.Services.AddScoped<ProjectNamePlaceholder.Api.Startup.ModuleSyncService>();
 builder.Services.AddScoped<ProjectNamePlaceholder.Api.Startup.TenantCoreModuleBackfillService>();

@@ -98,6 +98,35 @@
           { "condition": "(cache != \"redis\")", "value": "false" }
         ]
       }
+    },
+    "messagebroker": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "inprocess",
+      "description": "Integration Hub event bus backend. Both are real, working implementations of IEventBus -- rabbitmq gets you at-least-once delivery across process boundaries (see templates/GUIDE.md §8); inprocess is fine until a second module needs to react to another module's events reliably.",
+      "choices": [
+        {
+          "choice": "inprocess",
+          "description": "In-process, DI-resolved handlers, no delivery guarantees beyond the caller's own transaction"
+        },
+        {
+          "choice": "rabbitmq",
+          "description": "RabbitMQ-backed, durable topic exchange + quorum queues with dead-lettering"
+        }
+      ]
+    },
+    "UseRabbitMq": {
+      "type": "generated",
+      "generator": "switch",
+      "replaces": "USE_RABBITMQ_TOKEN",
+      "parameters": {
+        "evaluator": "C++",
+        "datatype": "bool",
+        "cases": [
+          { "condition": "(messagebroker == \"rabbitmq\")", "value": "true" },
+          { "condition": "(messagebroker != \"rabbitmq\")", "value": "false" }
+        ]
+      }
     }
   },
   "postActions": [

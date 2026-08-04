@@ -26,7 +26,10 @@ This repository is a layered ASP.NET Core API built around `ProjectNamePlacehold
 - `ConnectionStrings:PostgresConnection`
 - `ConnectionStrings:SqlServerConnection`
 - `ConnectionStrings:Redis`
+- `ConnectionStrings:RabbitMq`
 - `Database:Provider`
+- `Integration:UseRabbitMq` (RabbitMQ-backed `IEventBus` if enabled; in-process, same-transaction otherwise. Both implementations always ship — like `Caching:UseRedis`, `dotnet new olympus-multi --messagebroker <inprocess|rabbitmq>` just seeds this config value's default)
+- `Integration:RabbitMq:ExchangeName`
 - `Caching:UseRedis`
 - `Caching:RedisInstanceName`
 - `Caching:PermissionsTtlMinutes`
