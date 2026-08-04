@@ -1,14 +1,14 @@
 # Building an ERP / Multi-Tenant Product on Olympus
 
-A practical guide for using the `olympus-multi` / `olympus-module` / `olympus-feature` templates to
-start a new multi-tenant SaaS product — ERP, CRM, LMS, or anything else with the same shape:
-many tenants, each with their own users, roles, licensed modules, and data.
+A practical guide for using the `olympus-multi` template to start a new multi-tenant SaaS product —
+ERP, CRM, LMS, or anything else with the same shape: many tenants, each with their own users,
+roles, licensed modules, and data.
 
 This guide is deliberately honest about scope. Olympus gives you the multi-tenancy, auth, and
 module-registration plumbing — the undifferentiated, easy-to-get-wrong 20% every product like this
-needs. It does not give you Product/Inventory/Accounting/Order modules, background jobs, a message
-broker, file storage, or search. Section 8 covers exactly what's real today and what you'll need to
-add yourself, and in what order.
+needs. It does not give you Product/Inventory/Accounting/Order modules, background jobs, file
+storage, or search. Section 8 covers exactly what's real today and what you'll need to add
+yourself, and in what order.
 
 ---
 
@@ -23,10 +23,10 @@ add yourself, and in what order.
 | Feature flags | Per-tenant, with deterministic rollout-percentage bucketing (`/feature-flags`) |
 | Licensing | Trial / grace-period / expiry / suspension per tenant, enforced as `402 Payment Required` on every request once a tenant's license lapses (`/tenant/license` self-service status) |
 | Module framework | `IOlympusModule` + `ModuleHost` — implement one interface, get discovered and wired automatically (permissions, menus, catalog rows) — no manual registration anywhere |
-| Event bus | `IEventBus`/`IIntegrationEvent`/`IIntegrationEventHandler<T>` — in-process, DI-resolved, minimal. Exists so one module can react to another's fact without a hard reference |
+| Event bus | `IEventBus`/`IIntegrationEvent`/`IIntegrationEventHandler<T>` — in-process by default, or RabbitMQ-backed via `--messagebroker rabbitmq` (durable exchange, quorum queues, dead-lettering). Exists so one module can react to another's fact without a hard reference |
 | Audit trail | Every entity Create/Update/Delete captured automatically via a `SaveChanges` interceptor — tenant-scoped, actor-attributed, no per-feature wiring needed |
 | Rate limiting | Per-tenant, partitioned by JWT claim |
-| Scaffolding | `dotnet new olympus-module` / `olympus-feature` to add a business module or a vertical-slice feature in seconds |
+| Scaffolding | None — add a business module or feature by hand, copying `Core`/`Platform` (see §5/§6). Kept deliberately to one `dotnet new` command instead of three |
 
 Everything above is real, working code, verified end-to-end (build, test, and — for the module
 template — actual runtime discovery) as of this template's current state.
@@ -36,7 +36,7 @@ template — actual runtime discovery) as of this template's current state.
 ## 2. Prerequisites
 
 - .NET 8 SDK
-- PostgreSQL (the only database provider actually implemented — see §8)
+- PostgreSQL, or SQL Server if you generate with `--database sqlserver`
 - Redis, only if you want `--cache redis` instead of the in-memory default
 
 ---
@@ -44,21 +44,27 @@ template — actual runtime discovery) as of this template's current state.
 ## 3. Create your solution
 
 ```bash
-dotnet new install .   # from the repo root -- installs all three templates at once
-dotnet new olympus-multi -n MyErpApp --cache redis -o ./MyErpApp
+dotnet new install .   # from the repo root
+dotnet new olympus-multi -n MyErpApp --database postgres --cache redis --messagebroker inprocess -o ./MyErpApp
 ```
 
 > The live repo is itself the template (`sourceName: "ProjectNamePlaceholder"` in the root
 > `.template.config/template.json`) — there's no separate copy to keep in sync. One consequence:
-> `src/ProjectNamePlaceholder.Api/appsettings.json`'s `UseRedis` value is the literal token
-> `USE_REDIS_TOKEN` in the raw repo (so template generation can substitute `true`/`false` into
-> valid JSON) — set it to a real boolean yourself if you ever want to `dotnet run` this repo
-> directly instead of generating from it.
+> a few `src/ProjectNamePlaceholder.Api/appsettings.json` values are literal, unresolved template
+> tokens in the raw repo (`UseRedis` is `USE_REDIS_TOKEN`, `Integration:UseRabbitMq` is
+> `USE_RABBITMQ_TOKEN`, `Database:Provider` is `DB_PROVIDER_TOKEN`) — that's how template generation
+> substitutes real values into valid JSON. Set them to real values yourself if you ever want to
+> `dotnet run` this repo directly instead of generating from it. `Database:Provider` falls back to
+> `postgres` automatically if you don't (so that one only matters if you want to exercise the SQL
+> Server path from the raw repo); `UseRedis`/`UseRabbitMq` being unresolved leaves the raw
+> `appsettings.json` invalid JSON until fixed.
 
 `-n` renames everything — project files, namespaces, assembly names, the solution file — from
-`ProjectNamePlaceholder` to `MyErpApp`. `--cache` is `memory` (default) or `redis`; it's the only
-solution-level parameter exposed, because it's the only one with two real, working implementations
-behind it.
+`ProjectNamePlaceholder` to `MyErpApp`. `--database` is `postgres` (default) or `sqlserver` —
+picking one excludes the other provider's packages, DI wiring, boot-lock implementation, and EF
+Core migrations from the generated solution entirely. `--cache` is `memory` (default) or `redis`.
+These are the only solution-level parameters exposed, because they're the only ones with two real,
+working implementations behind them.
 
 ```bash
 cd MyErpApp/src
@@ -67,8 +73,9 @@ dotnet build src.sln          # confirm it compiles as-is
 
 Then, before first run:
 
-1. Set `ConnectionStrings:PostgresConnection` in `appsettings.json` (or environment-specific
-   overrides) to a real Postgres instance.
+1. Set `ConnectionStrings:PostgresConnection` (or `ConnectionStrings:SqlServerConnection`, if you
+   generated with `--database sqlserver`) in `appsettings.json` (or environment-specific overrides)
+   to a real database instance.
 2. Set `Jwt:SecretKey` to a real secret (32+ characters) — never ship the placeholder.
 3. Optionally set `Bootstrap:PlatformAdminEmail`/`Bootstrap:PlatformAdminPassword` — leave the
    password blank to have one generated and logged on first boot.
@@ -105,18 +112,9 @@ module you add next.
 
 ## 5. Add your first business module
 
-Business logic goes in a module. Run this **from inside the `.Application` project directory**:
-
-```bash
-cd MyErpApp.Application
-dotnet new olympus-module -n Product --rootNamespace MyErpApp
-```
-
-`--rootNamespace` must match whatever `-n` you gave `olympus-multi` above (defaults to
-`ProjectNamePlaceholder`, which is only correct if you're scaffolding directly into this
-un-renamed repo, not a generated solution).
-
-This generates `Modules/Product/ProductModule.cs`:
+Business logic goes in a module. There's no generator for this — create the file yourself,
+following `Core`/`Platform` (`Application/ModuleSystem/CoreModule.cs`, `PlatformModule.cs`) as the
+pattern. Create `MyErpApp.Application/Modules/Product/ProductModule.cs`:
 
 ```csharp
 namespace MyErpApp.BusinessModules.Product;
@@ -171,12 +169,8 @@ runtime surprise).
 
 ## 6. Add a feature (vertical slice) inside a module
 
-```bash
-cd MyErpApp.Application
-dotnet new olympus-feature --module Product -n CreateProduct --rootNamespace MyErpApp
-```
-
-Generates `Modules/Product/Features/CreateProduct/`:
+Same deal — no generator, create the files under
+`MyErpApp.Application/Modules/Product/Features/CreateProduct/` yourself:
 
 ```
 CreateProductRequest.cs      # what the client sends
@@ -184,10 +178,9 @@ CreateProductResponse.cs     # what you send back
 CreateProductCommand.cs      # the internal instruction
 CreateProductRequestValidator.cs   # FluentValidation
 CreateProductHandler.cs      # ICommandHandler<CreateProductCommand, CreateProductResponse>
-README.md                    # the two manual wiring steps below, spelled out for this feature
 ```
 
-Two manual steps (the README in the generated folder has the exact snippet):
+Then two wiring steps:
 
 ```csharp
 // Application/DependencyInjection.cs
@@ -253,13 +246,18 @@ infrastructure **when a real module's real requirements demand it**, not specula
 1. **One real module first.** Prove the pattern end-to-end (Product is a reasonable first choice —
    almost everything else references it) before building a second. Let its actual pain points tell
    you what's next, rather than guessing upfront.
-2. **A real Integration Hub, once two modules need to talk.** The `IEventBus` here has no delivery
-   guarantees (no outbox, no retries, no idempotency) — fine for one handler, not fine for "Order
-   placed → must reliably notify Inventory, Accounting, and Courier." Add `ICommandBus`/`IQueryBus`
-   the same way: when a concrete cross-module call needs one, not before.
-3. **Background jobs (Hangfire/Quartz) and a message broker**, once you have anything that isn't
-   pure request/response — courier polling, scheduled campaigns, recurring billing, async
-   AI/content workflows. None of this exists in the template; it's a from-scratch addition.
+2. **A real Integration Hub, once two modules need to talk.** `--messagebroker rabbitmq` gets you
+   `RabbitMqEventBus`/`RabbitMqEventConsumer` (`Infrastructure/Messaging/`) — a durable topic
+   exchange, one quorum queue per discovered `IIntegrationEventHandler<T>`, at-least-once with
+   automatic dead-lettering after a few failed attempts (RabbitMQ's own `x-delivery-limit`, not a
+   hand-rolled retry counter). The default is still `--messagebroker inprocess`
+   (`InProcessEventBus`) — same-transaction, no cross-process delivery guarantees, fine until a
+   second module needs to react reliably. Neither is a transactional outbox: a publish that races a
+   crash between your DB commit and the broker ack can still be lost either way. Add
+   `ICommandBus`/`IQueryBus` the same way: when a concrete cross-module call needs one, not before.
+3. **Background jobs (Hangfire/Quartz)**, once you have anything that isn't pure request/response —
+   courier polling, scheduled campaigns, recurring billing, async AI/content workflows. None of this
+   exists in the template; it's a from-scratch addition.
 4. **Physical module boundaries**, once you have enough real modules that "no module reaches into
    another's internals" needs compiler enforcement, not just discipline. Two modules aren't enough
    to justify it — we tried splitting `Core`/`Platform` into separate projects with only two modules
@@ -280,13 +278,7 @@ infrastructure **when a real module's real requirements demand it**, not specula
 dotnet new install .
 
 # Solution
-dotnet new olympus-multi -n <Name> [--cache memory|redis] -o <path>
-
-# Module (run from inside the *.Application project)
-dotnet new olympus-module -n <ModuleName> --rootNamespace <Name>
-
-# Feature (run from inside the *.Application project)
-dotnet new olympus-feature --module <ModuleName> -n <FeatureName> --rootNamespace <Name>
+dotnet new olympus-multi -n <Name> [--database postgres|sqlserver] [--cache memory|redis] [--messagebroker inprocess|rabbitmq] -o <path>
 
 # Uninstall
 dotnet new uninstall .

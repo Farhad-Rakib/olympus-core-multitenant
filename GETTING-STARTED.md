@@ -9,10 +9,11 @@ your actual project name — that substitution happened automatically at generat
 
 ## 1. First run
 
-1. **Database connection.** Set `ConnectionStrings:PostgresConnection` in
-   `src/ProjectNamePlaceholder.Api/appsettings.json` (or an environment-specific
-   `appsettings.{Environment}.json` / environment variables) to a real PostgreSQL instance.
-   Postgres is the only database provider implemented today.
+1. **Database connection.** Set `ConnectionStrings:PostgresConnection` (or
+   `ConnectionStrings:SqlServerConnection`, if you generated this project with
+   `--database sqlserver`) in `src/ProjectNamePlaceholder.Api/appsettings.json` (or an
+   environment-specific `appsettings.{Environment}.json` / environment variables) to a real
+   database instance.
 2. **JWT secret.** Set `Jwt:SecretKey` to a real secret, 32+ characters. Never ship the
    placeholder value.
 3. **Bootstrap admin.** Optionally set `Bootstrap:PlatformAdminEmail` /
@@ -43,7 +44,7 @@ that account and you have a working, empty multi-tenant admin panel — Swagger 
 | Per-tenant feature flags (deterministic rollout %) | `Application/FeatureFlags/`, `FeatureFlagsController` |
 | Per-tenant licensing (trial/grace/expiry/suspension, enforced as `402`) | `Application/Licensing/`, `TenantResolutionMiddleware` |
 | Module framework (`IOlympusModule` + `ModuleHost` discovery) | `Application/ModuleSystem/` |
-| In-process event bus (DI-resolved handlers) | `Application/Integration/`, `Api/Startup/InProcessEventBus.cs` |
+| Event bus (in-process by default, RabbitMQ via `--messagebroker rabbitmq`) | `Application/Integration/`, `Api/Startup/InProcessEventBus.cs`, `Infrastructure/Messaging/` |
 | Audit trail (every entity Create/Update/Delete, automatic) | `ApplicationDbContext.CaptureAuditEntries` |
 | Per-tenant API rate limiting | `Program.cs` (`AddRateLimiter`) |
 | Automated tests (xUnit + EF InMemory + NetArchTest layering checks) | `ProjectNamePlaceholder.UnitTests/` |
@@ -52,46 +53,26 @@ None of this is aspirational — it's the actual code you're looking at, not a p
 
 ## 3. What you don't have yet
 
-No Product/Order/Inventory/Accounting/CRM modules, no background job runner, no message broker, no
-file storage, no search engine, no payment gateway. This template is the multi-tenancy/auth/module
+No Product/Order/Inventory/Accounting/CRM modules, no background job runner, no file storage, no
+search engine, no payment gateway. This template is the multi-tenancy/auth/module
 scaffolding layer, not a finished business application — see §5 for the recommended build order.
 
 ---
 
 ## 4. Add your first module
 
-Business logic belongs in a module. This needs the `olympus-module`/`olympus-feature` templates
-installed once, from the **source template repo** (not this generated project):
+Business logic belongs in a module. There's no generator for this — create the file yourself,
+following `Core`/`Platform` (`Application/ModuleSystem/CoreModule.cs`, `PlatformModule.cs`) as the
+pattern. Create `src/ProjectNamePlaceholder.Application/Modules/Product/ProductModule.cs`
+implementing `IOlympusModule` — declare its permissions and menu there, and `ModuleHost` picks it
+up automatically on next boot. No other file needs editing: not `Program.cs`, not a permissions
+file, not a menu seeder.
 
-```bash
-git clone https://github.com/Farhad-Rakib/olympus-core-multitenant.git
-dotnet new install ./olympus-core-multitenant
-```
-
-Then, from inside *this* project:
-
-```bash
-cd src/ProjectNamePlaceholder.Application
-dotnet new olympus-module -n Product --rootNamespace ProjectNamePlaceholder
-```
-
-This generates `Modules/Product/ProductModule.cs` implementing `IOlympusModule` — declare its
-permissions and menu there, and `ModuleHost` picks it up automatically on next boot. No other file
-needs editing: not `Program.cs`, not a permissions file, not a menu seeder.
-
-Add a feature (vertical slice) inside it:
-
-```bash
-dotnet new olympus-feature --module Product -n CreateProduct --rootNamespace ProjectNamePlaceholder
-```
-
-Generates a Request/Response/Command/Validator/Handler under `Modules/Product/Features/CreateProduct/`,
-with the two remaining manual wiring steps (DI registration + controller action) spelled out in
-that folder's own `README.md`.
-
-> Always pass `--rootNamespace` explicitly, matching this project's actual name. Its default value
-> is only correct if you're scaffolding directly into the raw, un-generated template repo, which
-> this project isn't.
+Add a feature (vertical slice) inside it the same way: create a Request/Response/Command/
+Validator/Handler under `Modules/Product/Features/CreateProduct/` (see `templates/GUIDE.md` §6 in
+the [source template repo](https://github.com/Farhad-Rakib/olympus-core-multitenant) for the exact
+shape), then two manual wiring steps — register the handler in `Application/DependencyInjection.cs`
+and add a controller action.
 
 ---
 
@@ -101,10 +82,12 @@ Add infrastructure when a real module's real requirements demand it, not specula
 
 1. **One real module first** (Product is a reasonable start — most things reference it). Prove it
    end-to-end before starting a second.
-2. **A real Integration Hub**, once two modules need to talk reliably. The event bus here has no
-   delivery guarantees (no outbox, no retries) — fine for one handler, not for "Order placed must
-   reliably notify Inventory, Accounting, and Courier."
-3. **Background jobs + a message broker**, once you have anything that isn't pure request/response.
+2. **A real Integration Hub**, once two modules need to talk reliably. `--messagebroker rabbitmq`
+   gets you a durable-exchange, at-least-once event bus with automatic dead-lettering; the default
+   in-process bus has no cross-process delivery guarantees — fine for one handler, not for "Order
+   placed must reliably notify Inventory, Accounting, and Courier." Neither is a transactional
+   outbox.
+3. **Background jobs**, once you have anything that isn't pure request/response.
 4. **Physical module boundaries** (separate projects per module), once you have enough real modules
    that "don't reach into another module's internals" needs compiler enforcement, not just
    discipline. Two modules aren't enough to justify this — attempting it early risks a circular
