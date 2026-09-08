@@ -315,7 +315,18 @@ public sealed class AuthService : IAuthService
             <p>If you didn't request this, please ignore this email.</p>
         ";
 
-        await _emailService.SendAsync(user.Email, "Password Reset Request", htmlBody, cancellationToken);
+        try
+        {
+            await _emailService.SendAsync(user.Email, "Password Reset Request", htmlBody, cancellationToken);
+        }
+        catch (EmailDeliveryException)
+        {
+            // Swallowed on purpose: this endpoint answers identically whether or not the account
+            // exists, and letting a delivery failure surface as a 502 here would turn a broken
+            // mail provider into an account-enumeration oracle (unknown address -> 200,
+            // known address -> 502). The email provider has already logged the failure with the
+            // recipient and provider details, so nothing is lost by returning the neutral response.
+        }
 
         return new ForgotPasswordResponseDto("If an account exists with this email, a password reset link has been sent.");
     }

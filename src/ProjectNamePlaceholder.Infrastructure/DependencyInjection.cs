@@ -16,14 +16,27 @@ public static class DependencyInjection
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<SmtpOptions>(configuration.GetSection(SmtpOptions.SectionName));
+        services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
 
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IRefreshTokenGenerator, RefreshTokenGenerator>();
         services.AddScoped<IPasswordResetTokenGenerator, PasswordResetTokenGenerator>();
         services.AddScoped<IPasswordHasher, Pbkdf2PasswordHasher>();
-        services.AddScoped<IEmailService, SmtpEmailService>();
+        services.AddScoped<ITenantSmtpSettingsProvider, TenantSmtpSettingsProvider>();
         services.AddSingleton<ICurrentTenantService, CurrentTenantService>();
         services.AddSingleton<ICurrentUserService, CurrentUserService>();
+
+        // Same shape as Caching:UseRedis / Integration:UseRabbitMq -- both implementations always
+        // ship and config picks one, so swapping providers never needs a code change.
+        var provider = configuration.GetSection(EmailOptions.SectionName)[nameof(EmailOptions.Provider)];
+        if (string.Equals(provider, EmailOptions.LogProvider, StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddScoped<IEmailService, LoggingEmailService>();
+        }
+        else
+        {
+            services.AddScoped<IEmailService, SmtpEmailService>();
+        }
 
         return services;
     }

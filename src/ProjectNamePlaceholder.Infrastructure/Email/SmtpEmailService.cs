@@ -1,38 +1,68 @@
 using System.Net;
 using System.Net.Mail;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
+using ProjectNamePlaceholder.Application.Common.Exceptions;
+using ProjectNamePlaceholder.Application.Common.Interfaces;
 using ProjectNamePlaceholder.Application.Common.Interfaces.Services;
 
 namespace ProjectNamePlaceholder.Infrastructure.Email;
 
 public sealed class SmtpEmailService : IEmailService
 {
-    private readonly SmtpOptions _smtpOptions;
+    private readonly ITenantSmtpSettingsProvider _settingsProvider;
+    private readonly ICurrentTenantService _currentTenantService;
+    private readonly ILogger<SmtpEmailService> _logger;
 
-    public SmtpEmailService(IOptions<SmtpOptions> smtpOptions)
+    public SmtpEmailService(
+        ITenantSmtpSettingsProvider settingsProvider,
+        ICurrentTenantService currentTenantService,
+        ILogger<SmtpEmailService> logger)
     {
-        _smtpOptions = smtpOptions.Value;
+        _settingsProvider = settingsProvider;
+        _currentTenantService = currentTenantService;
+        _logger = logger;
     }
 
     public async Task SendAsync(string to, string subject, string htmlBody, CancellationToken cancellationToken = default)
     {
-        using var message = new MailMessage
+        var settings = await _settingsProvider.ResolveAsync(cancellationToken);
+        var tenantId = _currentTenantService.TenantId;
+
+        try
         {
-            From = new MailAddress(_smtpOptions.FromAddress, _smtpOptions.FromName),
-            Subject = subject,
-            Body = htmlBody,
-            IsBodyHtml = true
-        };
+            using var message = new MailMessage
+            {
+                From = new MailAddress(settings.FromAddress, settings.FromName),
+                Subject = subject,
+                Body = htmlBody,
+                IsBodyHtml = true
+            };
 
-        message.To.Add(new MailAddress(to));
+            message.To.Add(new MailAddress(to));
 
-        using var client = new SmtpClient(_smtpOptions.Host, _smtpOptions.Port)
+            using var client = new SmtpClient(settings.Host, settings.Port)
+            {
+                EnableSsl = settings.UseSsl,
+                Credentials = new NetworkCredential(settings.Username, settings.Password)
+            };
+
+            using var registration = cancellationToken.Register(client.SendAsyncCancel);
+            await client.SendMailAsync(message, cancellationToken);
+
+            _logger.LogInformation(
+                "Sent email to {Recipient} with subject {Subject} via {SmtpHost} for tenant {TenantId}.",
+                to, subject, settings.Host, tenantId);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            EnableSsl = _smtpOptions.UseSsl,
-            Credentials = new NetworkCredential(_smtpOptions.Username, _smtpOptions.Password)
-        };
+            // Wrapped so callers surface a 502 (upstream provider failed) instead of a raw
+            // SmtpException bubbling out as an opaque 500.
+            _logger.LogError(
+                exception,
+                "Failed to send email to {Recipient} with subject {Subject} via {SmtpHost} for tenant {TenantId}.",
+                to, subject, settings.Host, tenantId);
 
-        using var registration = cancellationToken.Register(client.SendAsyncCancel);
-        await client.SendMailAsync(message, cancellationToken);
+            throw new EmailDeliveryException(to, exception);
+        }
     }
 }

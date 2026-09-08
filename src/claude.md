@@ -42,7 +42,8 @@ This repository is a layered ASP.NET Core API built around `ProjectNamePlacehold
 - `Jwt:SecretKey`
 - `Jwt:ExpiryMinutes`
 - `Jwt:RefreshTokenExpiryDays`
-- `Smtp:*`
+- `Email:Provider` (`smtp` default, or `log` to write mail to the log instead of sending it — useful locally, where the placeholder SMTP host does not resolve. Anything unrecognised falls back to `smtp`)
+- `Smtp:*` (the **platform-wide fallback**. A tenant overrides any of these at runtime via its own `SiteSetting` rows — `Smtp.Host`, `Smtp.Port`, `Smtp.Username`, `Smtp.Password`, `Smtp.FromEmail`, `Smtp.FromName`, `Smtp.UseSsl` — resolved per key by `TenantSmtpSettingsProvider`, so a tenant that overrides only `Smtp.FromName` still inherits the platform host)
 - `Serilog:*`
 - `Bootstrap:PlatformAdminEmail` / `Bootstrap:PlatformAdminPassword` (the one-time global platform-admin account seeded on first run; leave the password empty to have one generated and logged instead — see `PlatformAdminSeeder`)
 
