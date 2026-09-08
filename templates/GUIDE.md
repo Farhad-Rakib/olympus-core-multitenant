@@ -28,8 +28,8 @@ yourself, and in what order.
 | Rate limiting | Per-tenant, partitioned by JWT claim |
 | Scaffolding | None — add a business module or feature by hand, copying `Core`/`Platform` (see §5/§6). Kept deliberately to one `dotnet new` command instead of three |
 
-Everything above is real, working code, verified end-to-end (build, test, and — for the module
-template — actual runtime discovery) as of this template's current state.
+Everything above is real, working code, verified end-to-end (build, test, and actual runtime
+module discovery) as of this template's current state.
 
 ---
 

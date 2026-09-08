@@ -187,20 +187,28 @@ dotnet ef database update --project src/ProjectNamePlaceholder.Persistence --sta
 
 ---
 
-## Roadmap: What's Missing for a Complete Multi-Tenant Framework
+## Roadmap: Remaining Work for a Complete Multi-Tenant Framework
 
-The current implementation covers the RBAC/tenant-isolation core well. Gaps identified while reviewing the system, roughly in priority order:
+The implementation covers the RBAC/tenant-isolation core, multi-tenancy, auth, and audit-trail requirements well. This section tracks genuine remaining gaps (work not yet started or completed). See `TASKS.md` for detailed per-area tracking — these are the major initiatives:
 
-1. **No FE-driven tenant provisioning trigger.** The companion frontend can create a tenant but never calls `POST /tenants/{id}/provision` — an operator must trigger it manually today (Swagger/curl). Needs a "Provision" action in the Tenants admin UI, or auto-provisioning on create.
-2. **No tenant deletion or data export.** `DELETE /tenants/{id}` only flips `IsActive` to false (soft-disable) — there's no hard-delete, data purge, or tenant data export path for offboarding/GDPR-style requests.
-3. **No self-serve tenant signup.** Tenant creation is an authenticated admin-only operation; there's no public registration flow for a new organization to sign itself up.
-4. **No re-provisioning automation.** When `RbacSeeder`/`DefaultMenuSeeder` gain new defaults, existing tenants don't pick them up until someone manually re-runs provisioning per tenant — there's no bulk "re-provision all tenants" job or migration-time backfill.
-5. **No tenant-level resource quotas or rate limiting.** Nothing throttles or caps usage (API calls, storage, seats) per tenant — needed for a SaaS-grade offering.
-6. **No tenant-level feature flags.** System settings are global-only; there's no mechanism to enable/disable features per tenant (e.g. gradual rollout, plan tiers).
-7. **No FE route-level permission enforcement.** The frontend has a `PermissionGuard` component but doesn't apply it to any route — any authenticated user can navigate to admin pages regardless of their actual permissions (server-side authorization still blocks the underlying API calls, but the UI itself isn't gated).
-8. **No automated test suite.** There is no test project in the solution — multi-tenant isolation (the query-filter/stamping logic in `ApplicationDbContext`) is exactly the kind of invariant that should have regression coverage.
-9. **Single shared database only.** Isolation is row-level (`TenantId` + query filters) with no option for schema-per-tenant or database-per-tenant, which some compliance-sensitive customers require.
-10. **No tenant-aware audit logging.** There's no structured audit trail of cross-cutting tenant-admin actions (tenant created/provisioned/disabled, role permission changes) for compliance or support.
-11. **No custom domain / subdomain-based tenant resolution.** Tenant resolution is JWT-claim or header based only — no support for resolving tenant from a subdomain or custom domain, which is standard for SaaS products.
+### Platform foundation
 
-Items 1, 4, 7, and 8 are the most impactful near-term (they affect correctness/usability of what already exists); the rest are larger platform investments to consider based on product direction.
+1. **Schema-per-tenant or database-per-tenant isolation tier** — currently row-level isolation only (`TenantId` + EF global query filters). A compliance-sensitive customer may require logical/physical per-tenant schemas/databases; investigated and deferred (needs EF `IModelCacheKeyFactory` rework + threading a schema name through ~10 `ICurrentTenantService`/`BeginScope` call sites). Scoped as its own initiative, not attempted opportunistically.
+
+2. **Physical module folder restructure** — move `Core` and `Platform` into separate projects (`Modules/Core/*`, `Modules/Platform/*`) to enforce module boundaries at compile time. Attempted once, reverted because of a circular dependency (`TenantService` ↔ `User`/`Role`), now resolved by the Integration Hub (event-driven decoupling). Worth reattempting; ~160-file undertaking.
+
+3. **`Olympus.Abstractions` / `Olympus.Sdk` as standalone NuGet packages** — not started; requires the module restructure above first to eliminate hard project-reference coupling.
+
+4. **CI pipeline with multi-parameter smoke-test matrix** — three template parameters (`--cache`, `--database`, `--messagebroker`) create an 8-cell matrix. No `.github/workflows` or CI pipeline exists yet; design and build once a CI infrastructure is chosen.
+
+### Product-scale concerns
+
+5. **Storage/usage quotas per tenant** — currently only seat quotas (`SubscriptionPlan.MaxUsers`) exist. A full storage quota requires a file/blob storage subsystem to meter against; deferred until such a module is built.
+
+6. **Cross-tenant impersonation/tenant-switcher UI for platform admins** — platform admins can manage tenants but have no UI to browse or act *as* another tenant (only their own tenant + global platform admin endpoints). Doable via `X-Tenant-Id` header support, which already exists server-side; needs FE UI.
+
+7. **Invite + admin-approval signup flow** — self-serve signup is actually invite-link + approval-required (`TenantRegistrationController`), not fully open registration. Docs/UX clarity issue, not a build gap — current flow is intentionally controlled.
+
+---
+
+**Near-term impact priorities**: items 1 & 2 (platform foundation) gate downstream work; items 5 & 6 (product scale) matter once the product grows; item 7 is a docs/UX fix only. Item 3 & 4 are infrastructure dependencies and should wait on business priorities.
