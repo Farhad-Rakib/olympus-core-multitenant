@@ -44,7 +44,10 @@ public sealed class AuthController : ControllerBase
     }
 
     [AllowAnonymous]
-    [SkipTenantResolution]
+    // Optional, NOT skipped: skipping meant the tenant was never resolved here, so the login screen
+    // could not be branded even on a tenant's own domain. Optional resolution still succeeds on the
+    // bare platform host, where there simply is no tenant and Branding comes back null.
+    [TenantResolutionOptional]
     [HttpGet("login-config")]
     [ProducesResponseType(typeof(ApiResponse<LoginConfigDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetLoginConfig(CancellationToken cancellationToken)

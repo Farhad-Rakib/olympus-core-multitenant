@@ -87,7 +87,14 @@ public sealed class AuthService : IAuthService
     public async Task<LoginConfigDto> GetLoginConfigAsync(CancellationToken cancellationToken = default)
     {
         var scope = await GetEffectiveScopeAsync(cancellationToken);
-        return new LoginConfigDto(scope == EmailUniquenessScope.PerTenant);
+
+        // Only when the request resolved to a tenant -- otherwise GetTenantBrandingAsync would run
+        // with no tenant scope and the site-settings query filter would return nothing anyway.
+        var branding = _currentTenantService.TenantId is not null
+            ? await _siteSettingService.GetTenantBrandingAsync(cancellationToken)
+            : null;
+
+        return new LoginConfigDto(scope == EmailUniquenessScope.PerTenant, branding);
     }
 
     public async Task<LoginResultDto> LoginAsync(LoginRequestDto request, CancellationToken cancellationToken = default)

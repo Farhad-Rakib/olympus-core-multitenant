@@ -45,6 +45,7 @@ public sealed class CoreModule : IOlympusModule
         new(Application.Security.Permissions.SiteSettingsDelete, "Delete site settings"),
         new(Application.Security.Permissions.FeatureFlagsRead, "View feature flags"),
         new(Application.Security.Permissions.FeatureFlagsManage, "Manage feature flags"),
+        new(Application.Security.Permissions.AuditLogsReadOwn, "View this tenant's audit logs"),
     ];
 
     public IReadOnlyList<MenuDefinition> Menus =>
@@ -59,5 +60,6 @@ public sealed class CoreModule : IOlympusModule
         new("Reports", "/reports", "chart-bar", Application.Security.Permissions.ReportsRead, "Configuration"),
         new("Site Settings", "/site-settings", "settings", Application.Security.Permissions.SiteSettingsRead, "Configuration"),
         new("Feature Flags", "/feature-flags", "flag", Application.Security.Permissions.FeatureFlagsRead, "Configuration"),
+        new("Audit Logs", "/audit-logs", "History", Application.Security.Permissions.AuditLogsReadOwn, "Configuration"),
     ];
 }

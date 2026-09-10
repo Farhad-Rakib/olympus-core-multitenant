@@ -40,7 +40,7 @@ public sealed class TenantProvisioningService : ITenantProvisioningService
         // permissions from modules this tenant is actually entitled to.
         await SeedModuleEntitlementsAsync(moduleKeys, cancellationToken);
         await _rbacSeeder.SeedAsync(cancellationToken);
-        await DefaultSiteSettingsSeeder.SeedAsync(_dbContext);
+        await DefaultSiteSettingsSeeder.SeedAsync(_dbContext, tenant.Name);
         await DefaultMenuSeeder.SeedAsync(_dbContext, _modules);
     }
 
@@ -49,7 +49,7 @@ public sealed class TenantProvisioningService : ITenantProvisioningService
         using var scope = _currentTenantService.BeginScope(tenant.Id, tenant.Slug);
 
         await _rbacSeeder.SeedAsync(cancellationToken);
-        await DefaultSiteSettingsSeeder.SeedAsync(_dbContext);
+        await DefaultSiteSettingsSeeder.SeedAsync(_dbContext, tenant.Name);
         await DefaultMenuSeeder.SeedAsync(_dbContext, _modules);
     }
 

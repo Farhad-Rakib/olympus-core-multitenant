@@ -30,6 +30,8 @@ public static class DependencyInjection
             //#endif
         });
 
+        services.AddScoped<IAuditLogRetentionService, ProjectNamePlaceholder.Persistence.Maintenance.AuditLogRetentionService>();
+        services.AddScoped<IProcessedBillingEventRepository, ProcessedBillingEventRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
@@ -80,10 +82,24 @@ public static class DependencyInjection
         return provider is "postgres" or "sqlserver" ? provider : "postgres";
     }
 
+    // Treats blank as missing, not just null: the environment-specific appsettings files ship these
+    // keys empty on purpose (the real value comes from an environment variable), and an empty string
+    // would otherwise sail past a null check and surface as an opaque provider-level parse error.
     private static string GetConnectionString(IConfiguration configuration, string key)
     {
-        return configuration.GetConnectionString(key)
-            ?? configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException($"Missing connection string: {key}.");
+        var connectionString = configuration.GetConnectionString(key);
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            connectionString = configuration.GetConnectionString("DefaultConnection");
+        }
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException(
+                $"Missing connection string: {key}. Set it in appsettings.json, or supply the " +
+                $"ConnectionStrings__{key} environment variable.");
+        }
+
+        return connectionString;
     }
 }

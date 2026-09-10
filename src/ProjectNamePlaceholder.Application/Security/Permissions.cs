@@ -37,7 +37,14 @@ public static class Permissions
     public const string TenantsManage = "tenants.manage";
     public const string SystemSettingsManage = "system-settings.manage";
     public const string SubscriptionPlansManage = "subscription-plans.manage";
+    // Platform-wide: PlatformModule (ModuleKind.System), never delegable to a tenant. Grants the
+    // cross-tenant view -- the caller may query any tenant, or omit the filter to see all of them.
     public const string AuditLogsRead = "audit-logs.read";
+
+    // Tenant-scoped counterpart: CoreModule, so a tenant admin CAN hold it. The controller pins
+    // the query to the ambient tenant for anyone holding only this one, so it can never widen into
+    // a cross-tenant read.
+    public const string AuditLogsReadOwn = "audit-logs.read-own";
     public const string FeatureFlagsRead = "feature-flags.read";
     public const string FeatureFlagsManage = "feature-flags.manage";
 
@@ -79,6 +86,7 @@ public static class Permissions
         SystemSettingsManage,
         SubscriptionPlansManage,
         AuditLogsRead,
+        AuditLogsReadOwn,
         FeatureFlagsRead,
         FeatureFlagsManage
     ];

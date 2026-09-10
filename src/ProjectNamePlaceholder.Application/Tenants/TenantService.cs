@@ -33,6 +33,7 @@ public sealed class TenantService : ITenantService
     private readonly TenantOffboardingOptions _offboardingOptions;
     private readonly ILicenseService _licenseService;
     private readonly IEventBus _eventBus;
+    private readonly IUserRepository _userRepository;
 
     public TenantService(
         IRepository<Tenant> tenantRepository,
@@ -49,7 +50,8 @@ public sealed class TenantService : ITenantService
         ITenantOffboardingService tenantOffboardingService,
         IOptions<TenantOffboardingOptions> offboardingOptions,
         ILicenseService licenseService,
-        IEventBus eventBus)
+        IEventBus eventBus,
+        IUserRepository userRepository)
     {
         _tenantRepository = tenantRepository;
         _moduleRepository = moduleRepository;
@@ -66,6 +68,7 @@ public sealed class TenantService : ITenantService
         _offboardingOptions = offboardingOptions.Value;
         _licenseService = licenseService;
         _eventBus = eventBus;
+        _userRepository = userRepository;
     }
 
     public async Task<IReadOnlyList<TenantDto>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -494,6 +497,52 @@ public sealed class TenantService : ITenantService
         }
 
         await _tenantOffboardingService.PurgeAsync(tenant, cancellationToken);
+    }
+
+    public async Task<TenantOverviewDto> GetOverviewAsync(long tenantId, CancellationToken cancellationToken = default)
+    {
+        var tenant = await _tenantRepository.GetByIdAsync(tenantId, cancellationToken)
+            ?? throw new AppException("Tenant not found.", 404);
+
+        using var scope = _currentTenantService.BeginScope(tenant.Id, tenant.Slug);
+
+        TenantPlanDto? plan = null;
+        var planModuleIds = new HashSet<long>();
+        if (tenant.SubscriptionPlanId is { } planId)
+        {
+            var subscriptionPlan = await _subscriptionPlanRepository.GetByIdAsync(planId, cancellationToken);
+            if (subscriptionPlan is not null)
+            {
+                plan = new TenantPlanDto(subscriptionPlan.Key, subscriptionPlan.Name, subscriptionPlan.Description, subscriptionPlan.MaxUsers);
+                planModuleIds = (await _subscriptionPlanModuleRepository.GetModuleIdsForPlanAsync(planId, cancellationToken)).ToHashSet();
+            }
+        }
+
+        var allModules = await _moduleRepository.GetAllAsync(cancellationToken);
+        var entitledModuleIds = (await _tenantModuleRepository.GetEntitledModuleIdsAsync(cancellationToken)).ToHashSet();
+
+        // Union of "sold in the plan" and "currently entitled": a module can be granted outside the
+        // plan, and one the plan includes can be switched off. Showing both, flagged, is what makes
+        // this answer "what did we buy, and what is actually on right now".
+        var modules = allModules
+            .Where(module => module.Kind != ModuleKind.System)
+            .Where(module => planModuleIds.Contains(module.Id) || entitledModuleIds.Contains(module.Id))
+            .OrderBy(module => module.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(module => new TenantModuleSummaryDto(module.Key, module.Name, module.Description, entitledModuleIds.Contains(module.Id)))
+            .ToList();
+
+        var userCount = await _userRepository.CountByTenantAsync(cancellationToken);
+        var licenseStatus = _licenseService.ComputeStatus(tenant);
+
+        return new TenantOverviewDto(
+            tenant.Name,
+            tenant.Slug,
+            plan,
+            licenseStatus,
+            tenant.TrialEndsAtUtc,
+            tenant.LicenseExpiresAtUtc,
+            userCount,
+            modules);
     }
 
     public Task<LicenseStatus> GetLicenseStatusAsync(long tenantId, CancellationToken cancellationToken = default) =>

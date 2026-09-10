@@ -28,9 +28,19 @@ public sealed class PostgresAdvisoryBootLock : IDistributedBootLock
 
     public async Task<IAsyncDisposable> AcquireAsync(CancellationToken cancellationToken = default)
     {
-        var connectionString = _configuration.GetConnectionString("PostgresConnection")
-            ?? _configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException("Missing connection string: PostgresConnection.");
+        // Blank counts as missing -- see DependencyInjection.GetConnectionString for why.
+        var connectionString = _configuration.GetConnectionString("PostgresConnection");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            connectionString = _configuration.GetConnectionString("DefaultConnection");
+        }
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException(
+                "Missing connection string: PostgresConnection. Set it in appsettings.json, or supply the " +
+                "ConnectionStrings__PostgresConnection environment variable.");
+        }
 
         var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);

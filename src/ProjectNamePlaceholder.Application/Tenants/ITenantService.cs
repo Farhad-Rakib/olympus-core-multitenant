@@ -31,6 +31,7 @@ public interface ITenantService
     // gate against an accidental irreversible call. Also requires the tenant to already be disabled
     // and past its cooling-off period; see TenantOffboardingOptions.PurgeCoolingOffDays.
     Task PurgeAsync(long tenantId, string confirmationSlug, CancellationToken cancellationToken = default);
+    Task<TenantOverviewDto> GetOverviewAsync(long tenantId, CancellationToken cancellationToken = default);
     Task<LicenseStatus> GetLicenseStatusAsync(long tenantId, CancellationToken cancellationToken = default);
     Task StartTrialAsync(long tenantId, DateTime trialEndsAtUtc, CancellationToken cancellationToken = default);
     Task SetLicenseExpiryAsync(long tenantId, DateTime? licenseExpiresAtUtc, CancellationToken cancellationToken = default);
