@@ -21,6 +21,8 @@ public sealed class SiteSettingService : ISiteSettingService
     private const string FaviconUrlKey = "Site.FaviconUrl";
     private const string BrandColorKey = "UI.BrandColor";
     private const string SupportEmailKey = "Site.SupportEmail";
+    private const string LocaleKey = "UI.Locale";
+    private const string TimeZoneKey = "UI.TimeZone";
 
     private readonly ISiteSettingRepository _siteSettingRepository;
     private readonly IUnitOfWork _unitOfWork;
@@ -97,6 +99,8 @@ public sealed class SiteSettingService : ISiteSettingService
         var faviconUrl = await _siteSettingRepository.GetByKeyAsync(FaviconUrlKey, cancellationToken);
         var brandColor = await _siteSettingRepository.GetByKeyAsync(BrandColorKey, cancellationToken);
         var supportEmail = await _siteSettingRepository.GetByKeyAsync(SupportEmailKey, cancellationToken);
+        var locale = await _siteSettingRepository.GetByKeyAsync(LocaleKey, cancellationToken);
+        var timeZone = await _siteSettingRepository.GetByKeyAsync(TimeZoneKey, cancellationToken);
 
         return new TenantBrandingDto(
             title?.Value,
@@ -104,7 +108,9 @@ public sealed class SiteSettingService : ISiteSettingService
             tagline?.Value,
             faviconUrl?.Value,
             brandColor?.Value,
-            supportEmail?.Value);
+            supportEmail?.Value,
+            locale?.Value,
+            timeZone?.Value);
     }
 
     private static SiteSettingDto MapToDto(SiteSetting setting)

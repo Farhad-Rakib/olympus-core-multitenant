@@ -17,6 +17,17 @@ public sealed class SubscriptionPlanConfiguration : IEntityTypeConfiguration<Sub
         builder.Property(x => x.MaxUsers).IsRequired();
         builder.Property(x => x.IsActive).HasDefaultValue(true);
 
+        // Explicit precision: without it EF maps decimal to the provider default, which silently
+        // truncates on SQL Server. 18,2 covers any realistic subscription price.
+        builder.Property(x => x.Price).HasPrecision(18, 2);
+        builder.Property(x => x.Currency).HasMaxLength(3).IsRequired();
+        builder.Property(x => x.BillingInterval).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(x => x.ExternalPriceId).HasMaxLength(200);
+
+        // Looked up when a webhook names a provider price; filtered so the many plans without one
+        // do not collide on a unique index.
+        builder.HasIndex(x => x.ExternalPriceId).IsUnique().HasFilter(null);
+
         builder.HasIndex(x => x.Key).IsUnique();
     }
 }

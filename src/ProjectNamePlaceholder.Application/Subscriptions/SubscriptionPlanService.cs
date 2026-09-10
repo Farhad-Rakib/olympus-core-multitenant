@@ -65,6 +65,7 @@ public sealed class SubscriptionPlanService : ISubscriptionPlanService
         }
 
         var plan = new SubscriptionPlan(request.Key, request.Name, request.Description, request.MaxUsers);
+        plan.SetPricing(request.Price, request.Currency, request.BillingInterval, request.ExternalPriceId);
         await _subscriptionPlanRepository.AddAsync(plan, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -82,6 +83,7 @@ public sealed class SubscriptionPlanService : ISubscriptionPlanService
             ?? throw new AppException("Subscription plan not found.", 404);
 
         plan.Update(request.Name, request.Description, request.MaxUsers);
+        plan.SetPricing(request.Price, request.Currency, request.BillingInterval, request.ExternalPriceId);
         _subscriptionPlanRepository.Update(plan);
 
         var moduleIds = await ResolveModuleIdsAsync(request.ModuleKeys, cancellationToken);
@@ -140,5 +142,9 @@ public sealed class SubscriptionPlanService : ISubscriptionPlanService
             plan.Description,
             plan.MaxUsers,
             plan.IsActive,
+            plan.Price,
+            plan.Currency,
+            plan.BillingInterval,
+            plan.ExternalPriceId,
             moduleIds.Where(moduleKeysById.ContainsKey).Select(id => moduleKeysById[id]).ToList());
 }

@@ -22,6 +22,11 @@ public static class DefaultSiteSettingsSeeder
             // Applied at runtime as a CSS custom property, so a tenant can match their palette
             // without a rebuild (Tailwind's own colors are compile-time).
             new SiteSetting { Key = "UI.BrandColor", Value = "#3b82f6", Description = "Primary brand color (hex)" },
+            // Locale and time zone are per-tenant, not per-user: a tenant operating in one country
+            // wants one consistent presentation. Previously dates rendered in whatever locale each
+            // viewer's browser happened to use, so two colleagues saw different formats.
+            new SiteSetting { Key = "UI.Locale", Value = "en-US", Description = "BCP 47 locale for dates, numbers and currency" },
+            new SiteSetting { Key = "UI.TimeZone", Value = "UTC", Description = "IANA time zone (e.g. Europe/London) used to display timestamps" },
             new SiteSetting { Key = "UI.Sidebar.Position", Value = "left", Description = "Sidebar position (left/right)" },
             new SiteSetting { Key = "UI.Sidebar.Collapsed", Value = "false", Description = "Sidebar collapsed by default" },
             new SiteSetting { Key = "UI.Navbar.Freeze", Value = "true", Description = "Navbar freeze enabled" },
