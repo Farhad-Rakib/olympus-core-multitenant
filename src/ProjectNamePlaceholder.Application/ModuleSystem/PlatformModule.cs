@@ -33,9 +33,9 @@ public sealed class PlatformModule : IOlympusModule
 
     public IReadOnlyList<MenuDefinition> Menus =>
     [
-        new("System Settings", "/system-settings", "sliders", Application.Security.Permissions.SystemSettingsManage, "Configuration"),
-        new("Tenants", "/tenants", "Building2", Application.Security.Permissions.TenantsManage, "Configuration"),
-        new("Subscription Plans", "/subscription-plans", "Package", Application.Security.Permissions.SubscriptionPlansManage, "Configuration"),
-        new("Audit Logs", "/audit-logs", "History", Application.Security.Permissions.AuditLogsRead, "Configuration"),
+        new("Platform", null, "server", null, null),
+        new("Tenants", "/tenants", "Building2", Application.Security.Permissions.TenantsManage, "Platform"),
+        new("Subscription Plans", "/subscription-plans", "Package", Application.Security.Permissions.SubscriptionPlansManage, "Platform"),
+        new("System Settings", "/system-settings", "sliders", Application.Security.Permissions.SystemSettingsManage, "Platform"),
     ];
 }
