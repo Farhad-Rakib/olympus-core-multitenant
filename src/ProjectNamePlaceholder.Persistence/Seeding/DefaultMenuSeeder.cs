@@ -12,7 +12,16 @@ namespace ProjectNamePlaceholder.Persistence.Seeding
         // any parent link is resolved, so pass order can't depend on module discovery order.
         public static async Task SeedAsync(ApplicationDbContext dbContext, IReadOnlyList<IOlympusModule> modules)
         {
-            var definitions = modules.SelectMany(m => m.Menus).ToList();
+            // Titles are the upsert key, so two modules declaring the same title must collapse to one
+            // definition (last wins) -- otherwise the lookup below, which only sees rows already
+            // saved, inserts a duplicate. Earlier versions did exactly that; RemoveDuplicateTitles
+            // repairs databases seeded by them.
+            var definitions = modules.SelectMany(m => m.Menus)
+                .GroupBy(d => d.Title, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.Last())
+                .ToList();
+
+            await RemoveDuplicateTitlesAsync(dbContext);
 
             var menusByTitle = new Dictionary<string, Menu>(StringComparer.OrdinalIgnoreCase);
             foreach (var definition in definitions)
@@ -38,6 +47,34 @@ namespace ProjectNamePlaceholder.Persistence.Seeding
             }
 
             await dbContext.SaveChangesAsync();
+        }
+
+        // Keeps the oldest row per title, re-points any children of the extras to it, and deletes
+        // the extras. Role/permission links are on RequiredPermission (not on the menu row), so
+        // nothing else references the removed ids.
+        private static async Task RemoveDuplicateTitlesAsync(ApplicationDbContext dbContext)
+        {
+            var all = await dbContext.Menus.ToListAsync();
+            var groups = all.GroupBy(m => m.Title.Trim(), StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1);
+            var changed = false;
+            foreach (var group in groups)
+            {
+                var keep = group.OrderBy(m => m.Id).First();
+                foreach (var extra in group.Where(m => m.Id != keep.Id))
+                {
+                    foreach (var child in all.Where(m => m.ParentMenuId == extra.Id))
+                    {
+                        child.ParentMenuId = keep.Id;
+                        child.ParentMenu = keep;
+                    }
+                    dbContext.Menus.Remove(extra);
+                    changed = true;
+                }
+            }
+            if (changed)
+            {
+                await dbContext.SaveChangesAsync();
+            }
         }
 
         private static async Task<Menu> UpsertMenuAsync(
