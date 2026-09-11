@@ -46,6 +46,9 @@ public sealed class CoreModule : IOlympusModule
         new(Application.Security.Permissions.FeatureFlagsRead, "View feature flags"),
         new(Application.Security.Permissions.FeatureFlagsManage, "Manage feature flags"),
         new(Application.Security.Permissions.AuditLogsReadOwn, "View this tenant's audit logs"),
+        new(Application.Security.Permissions.BillingManage, "Manage this tenant's subscription and billing"),
+        new(Application.Security.Permissions.TranslationsManage, "Manage UI translations"),
+        new(Application.Security.Permissions.UsersImpersonate, "Sign in as another user of this tenant (support)"),
     ];
 
     public IReadOnlyList<MenuDefinition> Menus =>
@@ -61,5 +64,7 @@ public sealed class CoreModule : IOlympusModule
         new("Site Settings", "/site-settings", "settings", Application.Security.Permissions.SiteSettingsRead, "Configuration"),
         new("Feature Flags", "/feature-flags", "flag", Application.Security.Permissions.FeatureFlagsRead, "Configuration"),
         new("Audit Logs", "/audit-logs", "History", Application.Security.Permissions.AuditLogsReadOwn, "Configuration"),
+        new("Billing", "/billing", "receipt", Application.Security.Permissions.BillingManage, "Configuration"),
+        new("Translations", "/translations", "languages", Application.Security.Permissions.TranslationsManage, "Configuration"),
     ];
 }

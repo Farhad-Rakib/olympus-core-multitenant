@@ -24,6 +24,11 @@ public sealed class SubscriptionPlan : BaseEntity
     // mapping lives with the plan, and nullable because a plan can exist before it is sold.
     public string? ExternalPriceId { get; private set; }
 
+    // Per-tenant API budget, requests per minute across all of the tenant's users. 0 means "use
+    // the platform default" (RateLimiting:PermitLimit), so existing plans keep behaving as before.
+    // Higher tiers buy more headroom; the point is that one plan's traffic can't starve another's.
+    public int RequestsPerMinute { get; private set; }
+
     private SubscriptionPlan()
     {
     }
@@ -68,6 +73,16 @@ public sealed class SubscriptionPlan : BaseEntity
         Currency = currency.Trim().ToUpperInvariant();
         BillingInterval = billingInterval;
         ExternalPriceId = string.IsNullOrWhiteSpace(externalPriceId) ? null : externalPriceId.Trim();
+    }
+
+    public void SetRateLimit(int requestsPerMinute)
+    {
+        if (requestsPerMinute < 0)
+        {
+            throw new ArgumentException("Requests per minute cannot be negative.", nameof(requestsPerMinute));
+        }
+
+        RequestsPerMinute = requestsPerMinute;
     }
 
     public void Update(string name, string description, int maxUsers)

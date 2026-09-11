@@ -66,6 +66,7 @@ public sealed class SubscriptionPlanService : ISubscriptionPlanService
 
         var plan = new SubscriptionPlan(request.Key, request.Name, request.Description, request.MaxUsers);
         plan.SetPricing(request.Price, request.Currency, request.BillingInterval, request.ExternalPriceId);
+        plan.SetRateLimit(request.RequestsPerMinute);
         await _subscriptionPlanRepository.AddAsync(plan, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -84,6 +85,7 @@ public sealed class SubscriptionPlanService : ISubscriptionPlanService
 
         plan.Update(request.Name, request.Description, request.MaxUsers);
         plan.SetPricing(request.Price, request.Currency, request.BillingInterval, request.ExternalPriceId);
+        plan.SetRateLimit(request.RequestsPerMinute);
         _subscriptionPlanRepository.Update(plan);
 
         var moduleIds = await ResolveModuleIdsAsync(request.ModuleKeys, cancellationToken);
@@ -146,5 +148,6 @@ public sealed class SubscriptionPlanService : ISubscriptionPlanService
             plan.Currency,
             plan.BillingInterval,
             plan.ExternalPriceId,
+            plan.RequestsPerMinute,
             moduleIds.Where(moduleKeysById.ContainsKey).Select(id => moduleKeysById[id]).ToList());
 }

@@ -513,7 +513,7 @@ public sealed class TenantService : ITenantService
             var subscriptionPlan = await _subscriptionPlanRepository.GetByIdAsync(planId, cancellationToken);
             if (subscriptionPlan is not null)
             {
-                plan = new TenantPlanDto(subscriptionPlan.Key, subscriptionPlan.Name, subscriptionPlan.Description, subscriptionPlan.MaxUsers);
+                plan = new TenantPlanDto(subscriptionPlan.Key, subscriptionPlan.Name, subscriptionPlan.Description, subscriptionPlan.MaxUsers, subscriptionPlan.Price, subscriptionPlan.Currency, subscriptionPlan.BillingInterval);
                 planModuleIds = (await _subscriptionPlanModuleRepository.GetModuleIdsForPlanAsync(planId, cancellationToken)).ToHashSet();
             }
         }

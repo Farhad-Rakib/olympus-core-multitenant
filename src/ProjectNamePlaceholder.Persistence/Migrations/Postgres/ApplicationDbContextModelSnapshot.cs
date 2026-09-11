@@ -8,7 +8,7 @@ using ProjectNamePlaceholder.Persistence.Context;
 
 #nullable disable
 
-namespace ProjectNamePlaceholder.Persistence.Migrations.SqlServer
+namespace ProjectNamePlaceholder.Persistence.Migrations.Postgres
 {
     [DbContext(typeof(ApplicationDbContext))]
     partial class ApplicationDbContextModelSnapshot : ModelSnapshot
@@ -560,6 +560,9 @@ namespace ProjectNamePlaceholder.Persistence.Migrations.SqlServer
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<int>("RequestsPerMinute")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -852,6 +855,52 @@ namespace ProjectNamePlaceholder.Persistence.Migrations.SqlServer
                     b.ToTable("tenant_registration_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("ProjectNamePlaceholder.Domain.Entities.Translation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("CreatedBy")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("UpdatedBy")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Language", "Key")
+                        .IsUnique();
+
+                    b.ToTable("translations", (string)null);
+                });
+
             modelBuilder.Entity("ProjectNamePlaceholder.Domain.Entities.User", b =>
                 {
                     b.Property<long>("Id")
@@ -1109,6 +1158,15 @@ namespace ProjectNamePlaceholder.Persistence.Migrations.SqlServer
                 });
 
             modelBuilder.Entity("ProjectNamePlaceholder.Domain.Entities.TenantRegistrationToken", b =>
+                {
+                    b.HasOne("ProjectNamePlaceholder.Domain.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ProjectNamePlaceholder.Domain.Entities.Translation", b =>
                 {
                     b.HasOne("ProjectNamePlaceholder.Domain.Entities.Tenant", null)
                         .WithMany()

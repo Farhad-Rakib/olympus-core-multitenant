@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ProjectNamePlaceholder.Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using ProjectNamePlaceholder.Persistence.Context;
+using ProjectNamePlaceholder.Persistence.ModulePersistence;
 using ProjectNamePlaceholder.Persistence.Repositories;
 using ProjectNamePlaceholder.Persistence.Seeding;
 using ProjectNamePlaceholder.Application.Menu;
@@ -11,8 +12,14 @@ namespace ProjectNamePlaceholder.Persistence;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddPersistence(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddPersistence(this IServiceCollection services, IConfiguration configuration, Action<ModulePersistenceOptions>? configureModules = null)
     {
+        // Singleton: EF builds the model once per app lifetime, so the assembly list must be fixed
+        // before the first DbContext is constructed and identical for every instance.
+        var modulePersistence = new ModulePersistenceOptions();
+        configureModules?.Invoke(modulePersistence);
+        services.AddSingleton(modulePersistence);
+
         services.AddDbContext<ApplicationDbContext>(options =>
         {
             var provider = GetProvider(configuration);
@@ -38,6 +45,7 @@ public static class DependencyInjection
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepository>();
         services.AddScoped<ISiteSettingRepository, SiteSettingRepository>();
+        services.AddScoped<ITranslationRepository, TranslationRepository>();
         services.AddScoped<ITenantFeatureFlagRepository, TenantFeatureFlagRepository>();
         services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();

@@ -48,6 +48,20 @@ public static class Permissions
     public const string FeatureFlagsRead = "feature-flags.read";
     public const string FeatureFlagsManage = "feature-flags.manage";
 
+    // Tenant-scoped: lets a tenant's own admin start a hosted checkout or open the billing portal
+    // for THEIR tenant. Deliberately in CoreModule (not PlatformModule) -- paying is the one thing
+    // a locked-out tenant must be able to do without a platform admin's help.
+    public const string BillingManage = "billing.manage";
+
+    // Tenant-scoped UI translation overrides. Reading the bundle itself is anonymous (the login
+    // page needs it); this gates the admin form.
+    public const string TranslationsManage = "translations.manage";
+
+    // "View as" a user of the same tenant for support. CoreModule so a tenant CAN delegate it, but
+    // deliberately NOT auto-granted to the Admin role (RbacSeeder) -- it must be handed out on
+    // purpose. Platform admins pass every policy and may impersonate across tenants.
+    public const string UsersImpersonate = "users.impersonate";
+
     public static readonly string[] All =
     [
         UsersRead,
@@ -88,6 +102,9 @@ public static class Permissions
         AuditLogsRead,
         AuditLogsReadOwn,
         FeatureFlagsRead,
-        FeatureFlagsManage
+        FeatureFlagsManage,
+        BillingManage,
+        TranslationsManage,
+        UsersImpersonate
     ];
 }

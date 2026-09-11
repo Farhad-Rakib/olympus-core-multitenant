@@ -24,9 +24,11 @@ public sealed class SubscriptionPlanConfiguration : IEntityTypeConfiguration<Sub
         builder.Property(x => x.BillingInterval).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(x => x.ExternalPriceId).HasMaxLength(200);
 
-        // Looked up when a webhook names a provider price; filtered so the many plans without one
-        // do not collide on a unique index.
-        builder.HasIndex(x => x.ExternalPriceId).IsUnique().HasFilter(null);
+        // Looked up when a webhook names a provider price. No explicit filter: Postgres treats NULLs
+        // as distinct in a unique index, and the SQL Server provider adds "IS NOT NULL" itself, so
+        // the many plans without a provider price never collide on either. (HasFilter(null) would
+        // REMOVE SQL Server's filter and make a second unpriced plan fail to insert.)
+        builder.HasIndex(x => x.ExternalPriceId).IsUnique();
 
         builder.HasIndex(x => x.Key).IsUnique();
     }

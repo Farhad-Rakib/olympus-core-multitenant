@@ -15,6 +15,11 @@ public sealed class AuditLogRepository : IAuditLogRepository
         _dbContext = dbContext;
     }
 
+    public async Task AddAsync(AuditLog entry, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.AuditLogs.AddAsync(entry, cancellationToken);
+    }
+
     public async Task<(IReadOnlyList<AuditLog> Items, int Total)> GetPagedAsync(AuditLogQuery query, CancellationToken cancellationToken = default)
     {
         var filtered = _dbContext.AuditLogs.AsNoTracking().AsQueryable();

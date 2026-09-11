@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectNamePlaceholder.Application.Auth;
 using ProjectNamePlaceholder.Application.AuditLogs;
+using ProjectNamePlaceholder.Application.Billing;
 using ProjectNamePlaceholder.Application.FeatureFlags;
 using ProjectNamePlaceholder.Application.Integration;
 using ProjectNamePlaceholder.Application.Licensing;
@@ -12,6 +13,7 @@ using ProjectNamePlaceholder.Application.SiteSettings;
 using ProjectNamePlaceholder.Application.Subscriptions;
 using ProjectNamePlaceholder.Application.SystemSettings;
 using ProjectNamePlaceholder.Application.Tenants;
+using ProjectNamePlaceholder.Application.Translations;
 using ProjectNamePlaceholder.Application.Tenants.Events;
 using ProjectNamePlaceholder.Application.Users;
 using ProjectNamePlaceholder.Application.Users.EventHandlers;
@@ -34,6 +36,9 @@ public static class DependencyInjection
         services.AddScoped<IAuditLogService, AuditLogService>();
         services.AddScoped<IFeatureFlagService, FeatureFlagService>();
         services.AddScoped<ILicenseService, LicenseService>();
+        services.AddScoped<ITenantBillingService, TenantBillingService>();
+        services.AddScoped<ITranslationService, TranslationService>();
+        services.AddScoped<IImpersonationService, ImpersonationService>();
         services.AddScoped<IIntegrationEventHandler<TenantApprovedIntegrationEvent>, CreateAdminUserOnTenantApprovedHandler>();
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
 

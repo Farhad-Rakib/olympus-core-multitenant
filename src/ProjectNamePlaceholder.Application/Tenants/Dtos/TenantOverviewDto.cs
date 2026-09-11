@@ -14,7 +14,16 @@ public sealed record TenantOverviewDto(
     int UserCount,
     IReadOnlyList<TenantModuleSummaryDto> Modules);
 
-public sealed record TenantPlanDto(string Key, string Name, string Description, int MaxUsers);
+// Pricing rides along so the dashboard can show what the tenant is paying without a second call;
+// BillingInterval.None with a zero price is the "not sold through a gateway" case.
+public sealed record TenantPlanDto(
+    string Key,
+    string Name,
+    string Description,
+    int MaxUsers,
+    decimal Price,
+    string Currency,
+    BillingInterval BillingInterval);
 
 // IsEnabled distinguishes "in your plan and switched on" from "in your plan but currently off",
 // which is what makes the module list actionable rather than decorative.

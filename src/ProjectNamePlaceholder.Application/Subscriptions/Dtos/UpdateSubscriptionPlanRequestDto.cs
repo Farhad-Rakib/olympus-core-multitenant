@@ -12,4 +12,6 @@ public sealed record UpdateSubscriptionPlanRequestDto(
     string Currency = "USD",
     BillingInterval BillingInterval = BillingInterval.None,
     string? ExternalPriceId = null,
+    // 0 = platform default (RateLimiting:PermitLimit).
+    int RequestsPerMinute = 0,
     IReadOnlyList<string>? ModuleKeys = null);

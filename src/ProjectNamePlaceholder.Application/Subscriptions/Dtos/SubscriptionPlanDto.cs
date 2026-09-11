@@ -13,4 +13,5 @@ public sealed record SubscriptionPlanDto(
     string Currency,
     BillingInterval BillingInterval,
     string? ExternalPriceId,
+    int RequestsPerMinute,
     IReadOnlyList<string> ModuleKeys);

@@ -192,7 +192,7 @@ public sealed class AuthService : IAuthService
         await _refreshTokenRepository.AddAsync(new RefreshToken(user.Id, newTokenHash, refreshToken.ExpiresAtUtc), cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var accessToken = _jwtTokenGenerator.GenerateAccessToken(user, permissions);
+        var accessToken = _jwtTokenGenerator.GenerateAccessToken(user, permissions, await PlanTokenOptionsAsync(user, cancellationToken));
 
         return new AuthTokensDto(
             accessToken,
@@ -420,9 +420,23 @@ public sealed class AuthService : IAuthService
         await _emailService.SendAsync(user.Email, "Password Changed", htmlBody, cancellationToken);
     }
 
+    // The plan's request budget rides in the token so the rate limiter never touches the database.
+    // A plan change therefore applies at the next token refresh (Jwt:ExpiryMinutes), not instantly.
+    private async Task<AccessTokenOptions?> PlanTokenOptionsAsync(User user, CancellationToken cancellationToken)
+    {
+        var tenant = await _tenantRepository.GetByIdAsync(user.TenantId, cancellationToken);
+        if (tenant?.SubscriptionPlanId is not { } planId)
+        {
+            return null;
+        }
+
+        var plan = await _subscriptionPlanRepository.GetByIdAsync(planId, cancellationToken);
+        return plan is { RequestsPerMinute: > 0 } ? new AccessTokenOptions(RequestsPerMinute: plan.RequestsPerMinute) : null;
+    }
+
     private async Task<AuthTokensDto> GenerateAuthTokensAsync(User user, IReadOnlyList<string> permissions, CancellationToken cancellationToken)
     {
-        var accessToken = _jwtTokenGenerator.GenerateAccessToken(user, permissions);
+        var accessToken = _jwtTokenGenerator.GenerateAccessToken(user, permissions, await PlanTokenOptionsAsync(user, cancellationToken));
         var refreshToken = _refreshTokenGenerator.Generate();
         var refreshTokenHash = ComputeSha256(refreshToken.Token);
 

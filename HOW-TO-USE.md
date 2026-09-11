@@ -82,10 +82,7 @@ VITE_API_BASE_URL=http://localhost:5000
 VITE_API_TIMEOUT_MS=30000
 ```
 
-> `VITE_USE_MOCK_API` also appears in `.env.example` but is **referenced nowhere in the source**.
-> It does nothing. Delete it.
-
-Other commands: `npm run build`, `npm run typecheck`, `npm run lint`.
+Other commands: `npm run build`, `npm run typecheck`, `npm run lint`, `npm test`.
 
 ---
 
@@ -178,6 +175,20 @@ add a query path to either, scope it yourself.
 For everyone else that header is a **no-op** — a regular user cannot spoof into another tenant.
 Every override writes an `Accessed` audit row recording who viewed which tenant, from where.
 
+### Impersonating a user ("view as")
+
+`POST /api/v1/users/{id}/impersonate` (permission `users.impersonate` — in `CoreModule` but
+**not** auto-granted to the Admin role; hand it out deliberately) returns a token that *is* the
+target user for `Auth:ImpersonationMinutes` (default 30) with an `act_by` claim naming the caller.
+No refresh token is issued; when it expires the frontend restores the support user's own session.
+Chaining is refused, tenant admins cannot impersonate platform admins, `change-password` is
+blocked under impersonation, and an `Accessed` audit row (`UserImpersonation`) is written.
+Frontend: "View as" on the Users page, a non-dismissible amber banner, "Stop impersonating".
+
+The frontend exposes this as the **tenant switcher** in the header (platform admins only). Picking a
+tenant stores `actingTenantSlug` in the auth store, every request sends it as `X-Tenant-Id`, the
+query cache is dropped, and a violet "You are administering tenant X" banner stays up until you exit.
+
 Endpoint opt-outs: `[SkipTenantResolution]`, `[TenantResolutionOptional]`, `[SkipLicenseCheck]`.
 
 ---
@@ -258,6 +269,21 @@ Nothing else changes. `BillingEventProcessor` maps neutral events onto licence a
 | `SubscriptionCancelled` | `Suspend()` |
 | `PlanChanged` | `AssignSubscriptionPlan()` |
 
+### Self-service checkout and portal
+
+`TenantBillingController` (`/api/v1/tenant/billing/*`, all `[SkipLicenseCheck]` — an expired tenant
+must be able to reach the thing that fixes it):
+
+| Endpoint | Who | What |
+|---|---|---|
+| `GET config` | any member | `{ provider, checkoutAvailable, defaultCurrency }` — `checkoutAvailable` is false under `manual` or while `Payment:Enabled` is off |
+| `GET plans` | any member | Active plans with a price, interval **and** `ExternalPriceId`, plus the tenant's current plan even if it has none of those |
+| `POST checkout` `{ planKey }` | `billing.manage` | Hosted checkout URL from `IPaymentGateway.CreateCheckoutUrlAsync`; 409 for a plan that is not sellable, 501 when checkout is unavailable |
+| `POST portal` | `billing.manage` | Hosted billing-portal URL |
+
+`billing.manage` lives in `CoreModule`, so a tenant's Admin role holds it by default. The frontend's
+`/billing` page lists the plans, and the licence banner links to it once the licence lapses.
+
 ### Webhook endpoint
 
 `POST /api/v1/billing/webhook` — anonymous and `[SkipTenantResolution]`, because it is authenticated
@@ -323,9 +349,11 @@ Modules are discovered by reflection at startup — no registration call. Then r
 
 > Put a permission in `PlatformModule` only if **no tenant** should ever hold it.
 
-> **Limitation:** modules own permissions and menus, *not* persistence. There is one
-> `ApplicationDbContext` and no schema separation, so a new module's tables land alongside `User`
-> and `Tenant`. Design a module-persistence boundary before building several domain modules.
+> **Persistence:** mark a module's entities `[OwnedByModule("billing")]` and register the module's
+> assembly with `AddPersistence(cfg, m => m.ModuleAssemblies.Add(...))`. Its tables land in schema
+> `billing`, and any core→module or module→module foreign key fails at startup. See
+> `src/Docs/MODULE_PERSISTENCE.md`. Schema-per-*tenant* isolation is designed but not built:
+> `src/Docs/SCHEMA_PER_TENANT.md`.
 
 ---
 
@@ -412,6 +440,44 @@ is orphaned files, which can be swept up later.
 
 ---
 
+## 10c. Localization
+
+**Backend** — `UseRequestLocalization` runs right after tenant resolution and sets
+`CultureInfo.CurrentCulture`/`CurrentUICulture` per request from, in order:
+
+1. `?culture=` query string
+2. the tenant's `UI.Locale` site setting (`TenantLocaleRequestCultureProvider`, cached 5 min)
+3. `Accept-Language`
+
+clamped to `Localization:SupportedCultures` (default `en-US`, `en-GB`). API message strings stay
+English; this makes number/date parsing, `IStringLocalizer` in your modules, and FluentValidation's
+built-in messages agree with what the frontend renders. The response carries `Content-Language`.
+
+**UI translations live in the database, per tenant.** English ships bundled with the frontend
+(`src/core/i18n/locales/en.json`) and is the fallback for every key; every other language is a set
+of overrides a tenant admin enters on the **Translations** page (`/translations`, permission
+`translations.manage`, in `CoreModule`). Rows are `(TenantId, Language, Key) → Value` in
+`translations`, keys mirror the English bundle's dotted paths (`common.save`), and a blank value
+deletes the override rather than storing an empty string.
+
+| Endpoint | Auth | Notes |
+|---|---|---|
+| `GET /api/v1/translations/{lang}` | anonymous, `[TenantResolutionOptional]`, `[SkipLicenseCheck]` | Flat map for the tenant resolved from host / `X-Tenant-Id`; empty on the bare platform host. Cached 1 h per tenant+language, evicted on write. |
+| `GET /api/v1/translations/languages` | anonymous | Languages the tenant has any rows for |
+| `PUT /api/v1/translations/{lang}` | `translations.manage` | Bulk upsert `{ entries: [{ key, value }] }` |
+| `DELETE /api/v1/translations/{lang}` | `translations.manage` | Remove the language entirely |
+
+On the client, `loadLanguage(lang)` fetches the bundle, nests it into i18next's resource shape and
+switches language; any key the tenant has not translated resolves to the English string, so a
+10 %-translated language is fully usable. A failed fetch still switches language (English fills
+in) rather than blocking. The active language is: the viewer's own choice from the header
+language switcher (persisted per browser) → otherwise the language part of the tenant's
+`UI.Locale`. Date/number formatting keeps the full tenant locale regardless (`format.ts`).
+
+New and recently touched components use `useTranslation`; most older pages still hardcode
+English — migrate them screen by screen as you touch them, adding keys to `en.json` (the
+Translations page picks new keys up automatically because it reads the bundled file).
+
 ## 11. Audit logging
 
 Every write is captured automatically in `SaveChanges` — no per-service opt-in:
@@ -492,6 +558,28 @@ Also set `Tenancy:BaseDomain` if you use subdomain routing, and a real `Jwt:Secr
 
 ---
 
+## 12b. Rate limiting per tenant and plan
+
+`RateLimiting` partitions **authenticated** traffic per tenant (`tenant_id` claim) and
+**anonymous** traffic per IP with its own, tighter budget:
+
+```json
+"RateLimiting": {
+  "Enabled": true,
+  "PermitLimit": 300,           // per tenant per window, unless the plan says otherwise
+  "WindowSeconds": 60,
+  "AnonymousPermitLimit": 60,   // per IP: login, registration, login-config, translations
+  "AnonymousWindowSeconds": 60,
+  "QueueLimit": 0
+}
+```
+
+A `SubscriptionPlan.RequestsPerMinute` above 0 overrides `PermitLimit` for that plan's tenants.
+The value is stamped into the access token as `plan_rpm` at login/refresh, so the limiter never
+reads the database — and a plan change takes effect at the next token refresh
+(`Jwt:ExpiryMinutes`), not instantly. One tenant exhausting its bucket gets 429s; nobody else does.
+Per-IP partitioning needs `Proxy:KnownNetworks` behind a load balancer (§12).
+
 ## 13. Middleware pipeline
 
 Order matters; this is the shipped order:
@@ -537,26 +625,25 @@ layer logs them.
 3. Add a migration (see below)
 4. Follow Rule 1 (§5) in any repository method using `Include` + `FirstOrDefault`
 
-**Add a migration** — the Design package lives in Persistence, so it is also the startup project:
+**Add a migration** — one per provider, always through the script:
 
 ```bash
-cd src
-dotnet ef migrations add MyMigration \
-  --project ProjectNamePlaceholder.Persistence \
-  --startup-project ProjectNamePlaceholder.Persistence \
-  --output-dir Migrations/Postgres
+scripts/ef-migration.sh add postgres  AddMyThing
+scripts/ef-migration.sh add sqlserver AddMyThing
+scripts/ef-migration.sh check sqlserver     # exit 1 if the model has drifted (CI runs both)
 ```
 
-> ⚠️ **SQL Server migrations do not currently generate correctly.** Both providers' migrations live
-> in one assembly, and EF resolves the Postgres snapshot as the baseline — producing a migration that
-> rewrites the entire schema from Postgres types to SQL Server types. Generate SQL Server migrations
-> in isolation and review them before committing. `processed_billing_events` currently has a
-> **Postgres migration only**.
+> ⚠️ **Do not run `dotnet ef migrations add` by hand for SQL Server.** Both providers' migrations
+> live in one assembly and only the Postgres set is compiled in the template source. Worse, EF
+> writes the updated `ApplicationDbContextModelSnapshot.cs` to the *first* file of that name it
+> finds under the project — `Migrations/Postgres/` — silently overwriting the other provider's
+> snapshot. The script flips the compile exclusion, runs EF with the matching design-time provider,
+> then puts the snapshot back where it belongs and restores the csproj.
 
 **Add an endpoint** — `[Authorize(Policy = Permissions.YourPermission)]`. Platform admins pass any
 policy automatically, so gate tenant features on the *tenant-scoped* permission.
 
-**Run tests** — `dotnet test` (79 tests). The frontend has no test suite.
+**Run tests** — `dotnet test` (125 tests). Frontend: `npm test` (vitest, 38 tests) and `npm run e2e` (Playwright, mocked API, 7 flows). `npm run lint` includes `jsx-a11y` rules as errors.
 
 **Docker services** — `docker compose up mailhog rabbitmq` (MailHog UI on `:8025`).
 
@@ -569,7 +656,6 @@ policy automatically, so gate tenant features on the *tenant-scoped* permission.
 - [ ] Set `Tenancy:BaseDomain` if using subdomains
 - [ ] Set `AuditLog:RetentionDays` — it defaults to 0, meaning keep forever (§11)
 - [ ] Replace default connection-string credentials
-- [ ] Generate the SQL Server migration for `processed_billing_events` if targeting SQL Server (§15)
-- [ ] Add plan pricing fields (`Price`, `Currency`, `BillingInterval`, `ExternalPriceId`) before
-      wiring a real gateway — `SubscriptionPlan` has no price today
-- [ ] Consider code-splitting the frontend (single ~1.7 MB bundle) and adding an error boundary
+- [ ] Set `Payment:CheckoutSuccessUrl` / `CheckoutCancelUrl` and a provider price id on every plan
+      you intend to sell (§8) — without the id, the plan is admin-managed only
+- [ ] Set `Localization:SupportedCultures` to the locales you actually serve, and translate the UI on the Translations page for each (§10c)

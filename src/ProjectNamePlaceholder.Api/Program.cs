@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Localization;
 using System.Text;
 using System.Threading.RateLimiting;
 using Asp.Versioning;
@@ -218,6 +219,40 @@ builder.Services.Configure<ProjectNamePlaceholder.Application.Common.Configurati
 
 builder.Services.Configure<PaymentOptions>(builder.Configuration.GetSection("Payment"));
 
+// Request culture: tenant's UI.Locale site setting first, then Accept-Language, clamped to the
+// configured supported list. Message strings stay English; this is about formatting, parsing and
+// FluentValidation's built-in messages agreeing with the frontend's locale.
+var localizationOptions = builder.Configuration.GetSection("Localization").Get<ProjectNamePlaceholder.Application.Common.Configuration.LocalizationOptions>()
+    ?? new ProjectNamePlaceholder.Application.Common.Configuration.LocalizationOptions();
+builder.Services.AddLocalization();
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    var supported = localizationOptions.SupportedCultures
+        .Where(c => !string.IsNullOrWhiteSpace(c))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+    if (supported.Length == 0)
+    {
+        supported = [localizationOptions.DefaultCulture];
+    }
+
+    options.SetDefaultCulture(localizationOptions.DefaultCulture)
+        .AddSupportedCultures(supported)
+        .AddSupportedUICultures(supported);
+
+    // en-GB requested but only en-US supported still lands on English rather than the default.
+    options.FallBackToParentCultures = true;
+    options.FallBackToParentUICultures = true;
+    options.ApplyCurrentCultureToResponseHeaders = true;
+
+    options.RequestCultureProviders =
+    [
+        new QueryStringRequestCultureProvider(),
+        new ProjectNamePlaceholder.Api.Middleware.TenantLocaleRequestCultureProvider(),
+        new AcceptLanguageHeaderRequestCultureProvider(),
+    ];
+});
+
 // Fail fast rather than at the first webhook: an enabled gateway with no signing secret would
 // accept unverified traffic that can extend a tenant's licence indefinitely.
 var paymentOptions = builder.Configuration.GetSection("Payment").Get<PaymentOptions>() ?? new PaymentOptions();
@@ -341,13 +376,34 @@ builder.Services.AddRateLimiter(options =>
     {
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
         {
-            var partitionKey = context.User.FindFirst("tenant_id")?.Value
-                ?? context.Connection.RemoteIpAddress?.ToString()
-                ?? "unknown";
+            var tenantId = context.User.FindFirst(CustomClaims.TenantId)?.Value;
 
-            return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+            if (string.IsNullOrEmpty(tenantId))
             {
-                PermitLimit = rateLimitingOptions.PermitLimit,
+                // Anonymous: per-IP, tighter. Requires Proxy:KnownNetworks behind a load balancer or
+                // every caller collapses into one bucket (see HOW-TO-USE §12).
+                var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                return RateLimitPartition.GetFixedWindowLimiter($"ip:{ip}", _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = rateLimitingOptions.AnonymousPermitLimit,
+                    Window = TimeSpan.FromSeconds(rateLimitingOptions.AnonymousWindowSeconds),
+                    QueueLimit = rateLimitingOptions.QueueLimit,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                });
+            }
+
+            // Per tenant, sized by the plan's budget carried in the token (no DB read here). The
+            // budget is part of the partition key on purpose: limiters are cached per key, so a plan
+            // change takes effect as soon as tokens carrying the new value appear, rather than being
+            // stuck with the options the first request created the limiter with.
+            var planClaim = context.User.FindFirst(CustomClaims.PlanRequestsPerMinute)?.Value;
+            var permit = int.TryParse(planClaim, out var planRpm) && planRpm > 0
+                ? planRpm
+                : rateLimitingOptions.PermitLimit;
+
+            return RateLimitPartition.GetFixedWindowLimiter($"tenant:{tenantId}:{permit}", _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = permit,
                 Window = TimeSpan.FromSeconds(rateLimitingOptions.WindowSeconds),
                 QueueLimit = rateLimitingOptions.QueueLimit,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
@@ -446,6 +502,8 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseRateLimiter();
 app.UseTenantResolution();
+// After tenant resolution on purpose: the tenant-locale provider needs the ambient tenant.
+app.UseRequestLocalization();
 app.UseTokenValidation();
 app.UseAuthorization();
 

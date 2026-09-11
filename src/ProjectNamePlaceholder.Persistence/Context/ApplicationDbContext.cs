@@ -2,11 +2,13 @@ using System.Reflection;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using ProjectNamePlaceholder.Application.Common.Exceptions;
 using ProjectNamePlaceholder.Application.Common.Interfaces;
 using ProjectNamePlaceholder.Domain.Common;
 using ProjectNamePlaceholder.Domain.Entities;
 using ProjectNamePlaceholder.Domain.Enums;
+using ProjectNamePlaceholder.Persistence.ModulePersistence;
 using Module = ProjectNamePlaceholder.Domain.Entities.Module;
 
 namespace ProjectNamePlaceholder.Persistence.Context;
@@ -28,14 +30,27 @@ public sealed class ApplicationDbContext : DbContext
         typeof(RefreshToken), typeof(PasswordResetToken), typeof(AuditLog)
     };
 
+    private readonly ModulePersistenceOptions _modulePersistence;
+
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, ICurrentTenantService currentTenantService, ICurrentUserService currentUserService)
+        : this(options, currentTenantService, currentUserService, null)
+    {
+    }
+
+    public ApplicationDbContext(
+        DbContextOptions<ApplicationDbContext> options,
+        ICurrentTenantService currentTenantService,
+        ICurrentUserService currentUserService,
+        ModulePersistenceOptions? modulePersistence)
         : base(options)
     {
         _currentTenantService = currentTenantService;
         _currentUserService = currentUserService;
+        _modulePersistence = modulePersistence ?? new ModulePersistenceOptions();
     }
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<Translation> Translations => Set<Translation>();
     public DbSet<TenantRegistrationToken> TenantRegistrationTokens => Set<TenantRegistrationToken>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Role> Roles => Set<Role>();
@@ -77,6 +92,20 @@ public sealed class ApplicationDbContext : DbContext
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
 
+        // Module-owned persistence: each registered module assembly contributes its own entity
+        // configurations, then ModulePersistenceConventions puts [OwnedByModule] tables in the
+        // module's schema and rejects any core->module or module->module foreign key.
+        foreach (var assembly in _modulePersistence.ModuleAssemblies.Distinct())
+        {
+            modelBuilder.ApplyConfigurationsFromAssembly(assembly);
+            foreach (var contributor in ModuleModelContributors(assembly))
+            {
+                contributor.Configure(modelBuilder);
+            }
+        }
+
+        ModulePersistenceConventions.Apply(modelBuilder);
+
         var setTenantFilterMethod = typeof(ApplicationDbContext)
             .GetMethod(nameof(SetTenantFilter), BindingFlags.NonPublic | BindingFlags.Instance)!;
 
@@ -92,6 +121,21 @@ public sealed class ApplicationDbContext : DbContext
 
         base.OnModelCreating(modelBuilder);
     }
+
+    // Stable identity of the registered module assembly set, for ModuleAwareModelCacheKeyFactory.
+    internal string ModulePersistenceSignature =>
+        string.Join("|", _modulePersistence.ModuleAssemblies.Select(a => a.FullName).Distinct().OrderBy(n => n, StringComparer.Ordinal));
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        optionsBuilder.ReplaceService<IModelCacheKeyFactory, ModuleAwareModelCacheKeyFactory>();
+        base.OnConfiguring(optionsBuilder);
+    }
+
+    private static IEnumerable<IModuleModelContributor> ModuleModelContributors(Assembly assembly) =>
+        assembly.GetTypes()
+            .Where(t => typeof(IModuleModelContributor).IsAssignableFrom(t) && t is { IsAbstract: false, IsInterface: false })
+            .Select(t => (IModuleModelContributor)Activator.CreateInstance(t)!);
 
     private void SetTenantFilter<TEntity>(ModelBuilder modelBuilder)
         where TEntity : class, ITenantEntity

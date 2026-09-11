@@ -309,6 +309,45 @@ namespace ProjectNamePlaceholder.Persistence.Migrations.SqlServer
                     b.ToTable("permissions", (string)null);
                 });
 
+            modelBuilder.Entity("ProjectNamePlaceholder.Domain.Entities.ProcessedBillingEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ExternalEventId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("ProcessedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("Provider", "ExternalEventId")
+                        .IsUnique();
+
+                    b.ToTable("processed_billing_events", (string)null);
+                });
+
             modelBuilder.Entity("ProjectNamePlaceholder.Domain.Entities.RefreshToken", b =>
                 {
                     b.Property<long>("Id")
@@ -474,16 +513,30 @@ namespace ProjectNamePlaceholder.Persistence.Migrations.SqlServer
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("BillingInterval")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<long>("CreatedBy")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ExternalPriceId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -503,6 +556,13 @@ namespace ProjectNamePlaceholder.Persistence.Migrations.SqlServer
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("RequestsPerMinute")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -510,6 +570,10 @@ namespace ProjectNamePlaceholder.Persistence.Migrations.SqlServer
                         .HasColumnType("bigint");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ExternalPriceId")
+                        .IsUnique()
+                        .HasFilter("[ExternalPriceId] IS NOT NULL");
 
                     b.HasIndex("Key")
                         .IsUnique();
@@ -792,6 +856,52 @@ namespace ProjectNamePlaceholder.Persistence.Migrations.SqlServer
                     b.ToTable("tenant_registration_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("ProjectNamePlaceholder.Domain.Entities.Translation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long>("CreatedBy")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long>("UpdatedBy")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Language", "Key")
+                        .IsUnique();
+
+                    b.ToTable("translations", (string)null);
+                });
+
             modelBuilder.Entity("ProjectNamePlaceholder.Domain.Entities.User", b =>
                 {
                     b.Property<long>("Id")
@@ -1049,6 +1159,15 @@ namespace ProjectNamePlaceholder.Persistence.Migrations.SqlServer
                 });
 
             modelBuilder.Entity("ProjectNamePlaceholder.Domain.Entities.TenantRegistrationToken", b =>
+                {
+                    b.HasOne("ProjectNamePlaceholder.Domain.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ProjectNamePlaceholder.Domain.Entities.Translation", b =>
                 {
                     b.HasOne("ProjectNamePlaceholder.Domain.Entities.Tenant", null)
                         .WithMany()
