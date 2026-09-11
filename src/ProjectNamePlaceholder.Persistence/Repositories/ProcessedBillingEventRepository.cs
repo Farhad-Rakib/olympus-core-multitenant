@@ -21,4 +21,15 @@ public sealed class ProcessedBillingEventRepository : IProcessedBillingEventRepo
 
     public async Task AddAsync(ProcessedBillingEvent processedEvent, CancellationToken cancellationToken = default)
         => await _dbContext.ProcessedBillingEvents.AddAsync(processedEvent, cancellationToken);
+
+    public async Task<IReadOnlyDictionary<long, DateTime>> GetLatestByTypeAsync(string eventType, CancellationToken cancellationToken = default)
+    {
+        var rows = await _dbContext.ProcessedBillingEvents
+            .AsNoTracking()
+            .Where(e => e.EventType == eventType)
+            .GroupBy(e => e.TenantId)
+            .Select(g => new { TenantId = g.Key, At = g.Max(e => e.ProcessedAtUtc) })
+            .ToListAsync(cancellationToken);
+        return rows.ToDictionary(r => r.TenantId, r => r.At);
+    }
 }

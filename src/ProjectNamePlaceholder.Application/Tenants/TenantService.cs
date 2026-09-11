@@ -1,3 +1,4 @@
+using ProjectNamePlaceholder.Application.Billing;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Options;
 using ProjectNamePlaceholder.Application.Common.Configuration;
@@ -32,6 +33,7 @@ public sealed class TenantService : ITenantService
     private readonly ITenantOffboardingService _tenantOffboardingService;
     private readonly TenantOffboardingOptions _offboardingOptions;
     private readonly ILicenseService _licenseService;
+    private readonly IProcessedBillingEventRepository _processedBillingEventRepository;
     private readonly IEventBus _eventBus;
     private readonly IUserRepository _userRepository;
 
@@ -50,6 +52,7 @@ public sealed class TenantService : ITenantService
         ITenantOffboardingService tenantOffboardingService,
         IOptions<TenantOffboardingOptions> offboardingOptions,
         ILicenseService licenseService,
+        IProcessedBillingEventRepository processedBillingEventRepository,
         IEventBus eventBus,
         IUserRepository userRepository)
     {
@@ -67,6 +70,7 @@ public sealed class TenantService : ITenantService
         _tenantOffboardingService = tenantOffboardingService;
         _offboardingOptions = offboardingOptions.Value;
         _licenseService = licenseService;
+        _processedBillingEventRepository = processedBillingEventRepository;
         _eventBus = eventBus;
         _userRepository = userRepository;
     }
@@ -74,13 +78,18 @@ public sealed class TenantService : ITenantService
     public async Task<IReadOnlyList<TenantDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var tenants = await _tenantRepository.GetAllAsync(cancellationToken);
-        return tenants.Select(MapTenant).ToList();
+        var lastPayments = await _processedBillingEventRepository.GetLatestByTypeAsync(
+            nameof(BillingEventType.SubscriptionRenewed), cancellationToken);
+        return tenants.Select(t => MapTenant(t, lastPayments)).ToList();
     }
 
     public async Task<TenantDto?> GetByIdAsync(long id, CancellationToken cancellationToken = default)
     {
         var tenant = await _tenantRepository.GetByIdAsync(id, cancellationToken);
-        return tenant is null ? null : MapTenant(tenant);
+        if (tenant is null) return null;
+        var lastPayments = await _processedBillingEventRepository.GetLatestByTypeAsync(
+            nameof(BillingEventType.SubscriptionRenewed), cancellationToken);
+        return MapTenant(tenant, lastPayments);
     }
 
     public async Task<TenantDto> CreateAsync(CreateTenantRequestDto request, CancellationToken cancellationToken = default)
@@ -588,6 +597,19 @@ public sealed class TenantService : ITenantService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
-    private static TenantDto MapTenant(Tenant tenant) =>
-        new(tenant.Id, tenant.Slug, tenant.Name, tenant.IsActive, tenant.SubscriptionPlanId, tenant.IsProvisioned);
+    private TenantDto MapTenant(Tenant tenant) => MapTenant(tenant, null);
+
+    private TenantDto MapTenant(Tenant tenant, IReadOnlyDictionary<long, DateTime>? lastPayments) =>
+        new(
+            tenant.Id,
+            tenant.Slug,
+            tenant.Name,
+            tenant.IsActive,
+            tenant.SubscriptionPlanId,
+            tenant.IsProvisioned,
+            _licenseService.ComputeStatus(tenant),
+            tenant.TrialEndsAtUtc,
+            tenant.LicenseExpiresAtUtc,
+            tenant.IsSuspended,
+            lastPayments is not null && lastPayments.TryGetValue(tenant.Id, out var paidAt) ? paidAt : null);
 }
