@@ -94,8 +94,14 @@
         "evaluator": "C++",
         "datatype": "bool",
         "cases": [
-          { "condition": "(cache == \"redis\")", "value": "true" },
-          { "condition": "(cache != \"redis\")", "value": "false" }
+          {
+            "condition": "(cache == \"redis\")",
+            "value": "true"
+          },
+          {
+            "condition": "(cache != \"redis\")",
+            "value": "false"
+          }
         ]
       }
     },
@@ -103,7 +109,7 @@
       "type": "parameter",
       "datatype": "choice",
       "defaultValue": "inprocess",
-      "description": "Integration Hub event bus backend. Both are real, working implementations of IEventBus -- rabbitmq gets you at-least-once delivery across process boundaries (see templates/GUIDE.md §8); inprocess is fine until a second module needs to react to another module's events reliably.",
+      "description": "Integration Hub event bus backend. Both are real, working implementations of IEventBus -- rabbitmq gets you at-least-once delivery across process boundaries (see templates/GUIDE.md \u00a78); inprocess is fine until a second module needs to react to another module's events reliably.",
       "choices": [
         {
           "choice": "inprocess",
@@ -123,10 +129,24 @@
         "evaluator": "C++",
         "datatype": "bool",
         "cases": [
-          { "condition": "(messagebroker == \"rabbitmq\")", "value": "true" },
-          { "condition": "(messagebroker != \"rabbitmq\")", "value": "false" }
+          {
+            "condition": "(messagebroker == \"rabbitmq\")",
+            "value": "true"
+          },
+          {
+            "condition": "(messagebroker != \"rabbitmq\")",
+            "value": "false"
+          }
         ]
       }
+    },
+    "safeProjectName": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "safe_namespace",
+      "fileRename": "ProjectNamePlaceholder",
+      "replaces": "ProjectNamePlaceholder",
+      "description": "Identifier-safe form of the project name (hyphens/spaces become underscores), used for both file names and contents so the .sln, .csproj references and namespaces always agree."
     }
   },
   "postActions": [

@@ -90,6 +90,10 @@ Other commands: `npm run build`, `npm run typecheck`, `npm run lint`, `npm test`
 
 `ProjectNamePlaceholder` is replaced everywhere.
 
+The name given with `-n` is used as-is for the output folder; inside it, project folders,
+`.csproj`s, the `.sln` and namespaces all use the identifier-safe form (`my-product` → `my_product`),
+so hyphenated names work. PascalCase (`MyProduct`) still gives the cleanest result.
+
 ```bash
 dotnet new install .
 
