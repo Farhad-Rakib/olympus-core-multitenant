@@ -44,7 +44,10 @@ public sealed class AuthController : ControllerBase
     }
 
     [AllowAnonymous]
-    [SkipTenantResolution]
+    // Optional, NOT skipped: skipping meant the tenant was never resolved here, so the login screen
+    // could not be branded even on a tenant's own domain. Optional resolution still succeeds on the
+    // bare platform host, where there simply is no tenant and Branding comes back null.
+    [TenantResolutionOptional]
     [HttpGet("login-config")]
     [ProducesResponseType(typeof(ApiResponse<LoginConfigDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetLoginConfig(CancellationToken cancellationToken)
@@ -125,6 +128,12 @@ public sealed class AuthController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequestDto request, CancellationToken cancellationToken)
     {
+        // A support session "viewing as" a user must not be able to change that user's password.
+        if (User.HasClaim(c => c.Type == ProjectNamePlaceholder.Application.Security.CustomClaims.ImpersonatedBy))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse.FailureResponse("Not available while impersonating a user.", StatusCodes.Status403Forbidden));
+        }
+
         await _changePasswordValidator.ValidateAndThrowAsync(request, cancellationToken);
         await _authService.ChangePasswordAsync(request, cancellationToken);
 

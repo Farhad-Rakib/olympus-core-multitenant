@@ -83,7 +83,7 @@ public sealed class RbacSeeder : IRbacSeeder
         foreach (var permission in persistedPermissions.Where(p =>
             p.Module is not null && p.Module.Kind != ModuleKind.System &&
             p.ModuleId.HasValue && entitledModuleIds.Contains(p.ModuleId.Value) &&
-            p.Name is not Permissions.UsersDelete and not Permissions.RolesDelete and not Permissions.UserRolesDelete and not Permissions.RolePermissionsDelete))
+            p.Name is not Permissions.UsersDelete and not Permissions.RolesDelete and not Permissions.UserRolesDelete and not Permissions.RolePermissionsDelete and not Permissions.UsersImpersonate))
         {
             if (existingSet.Add((admin.Id, permission.Id)))
             {

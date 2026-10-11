@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev, stage, 'feat/**', 'fix/**']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  build-and-test:
+    name: Build & test (template source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore src/src.sln
+
+      - name: Build
+        run: dotnet build src/src.sln --no-restore --configuration Release
+
+      # Layering rules live in the test project (Architecture/LayeringTests.cs), so this is also
+      # the architecture gate, not only a unit-test run.
+      - name: Test
+        run: >
+          dotnet test src/src.sln --no-build --configuration Release
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: TestResults
+
+  # The Postgres migrations are the ones compiled in the template source (the csproj removes
+  # Migrations/SqlServer/**); the SQL Server set is only verified through the smoke matrix below
+  # and through scripts/ef-migration.sh check sqlserver, which flips that exclusion.
+  migrations-in-sync:
+    name: Migrations match the model
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Install dotnet-ef
+        run: dotnet tool install --global dotnet-ef --version 8.*
+      - name: Postgres
+        run: scripts/ef-migration.sh check postgres
+      - name: SQL Server
+        run: scripts/ef-migration.sh check sqlserver
+
+  # Every `dotnet new olympus-multi` parameter combination must produce a solution that restores,
+  # builds and passes its tests. 2 x 2 x 2 = 8 cells; each excludes the other choice's packages,
+  # DI wiring and migrations, so a cell failing means dead code leaked past a #if guard.
+  template-smoke:
+    name: Template ${{ matrix.database }}/${{ matrix.cache }}/${{ matrix.messagebroker }}
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [postgres, sqlserver]
+        cache: [memory, redis]
+        messagebroker: [inprocess, rabbitmq]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install the template from source
+        run: dotnet new install .
+
+      - name: Generate a project
+        run: >
+          dotnet new olympus-multi -n SmokeApp
+          --database ${{ matrix.database }}
+          --cache ${{ matrix.cache }}
+          --messagebroker ${{ matrix.messagebroker }}
+          --output ${{ runner.temp }}/SmokeApp
+
+      - name: appsettings.json is valid JSON after token replacement
+        run: python3 -m json.tool ${{ runner.temp }}/SmokeApp/src/SmokeApp.Api/appsettings.json > /dev/null
+
+      - name: No placeholder tokens survive generation
+        run: |
+          if grep -rIn --exclude-dir=bin --exclude-dir=obj --exclude="*.md" -e ProjectNamePlaceholder -e _TOKEN ${{ runner.temp }}/SmokeApp/src; then
+            echo "::error::Unreplaced template tokens found in generated project"; exit 1
+          fi
+
+      - name: Only the chosen provider's migrations ship
+        run: |
+          cd ${{ runner.temp }}/SmokeApp/src/SmokeApp.Persistence/Migrations
+          ls
+          if [ "${{ matrix.database }}" = "postgres" ]; then test -d Postgres && test ! -d SqlServer; else test -d SqlServer && test ! -d Postgres; fi
+
+      - name: Build generated solution
+        run: dotnet build ${{ runner.temp }}/SmokeApp/src/src.sln --configuration Release
+
+      - name: Test generated solution
+        run: dotnet test ${{ runner.temp }}/SmokeApp/src/src.sln --no-build --configuration Release

@@ -1,3 +1,5 @@
+using ProjectNamePlaceholder.Domain.Enums;
+
 namespace ProjectNamePlaceholder.Application.Subscriptions.Dtos;
 
 public sealed record SubscriptionPlanDto(
@@ -7,4 +9,9 @@ public sealed record SubscriptionPlanDto(
     string Description,
     int MaxUsers,
     bool IsActive,
+    decimal Price,
+    string Currency,
+    BillingInterval BillingInterval,
+    string? ExternalPriceId,
+    int RequestsPerMinute,
     IReadOnlyList<string> ModuleKeys);

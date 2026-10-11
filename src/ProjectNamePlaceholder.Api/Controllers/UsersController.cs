@@ -16,10 +16,31 @@ namespace ProjectNamePlaceholder.Api.Controllers;
 public sealed class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
+    private readonly IImpersonationService _impersonationService;
 
-    public UsersController(IUserService userService)
+    public UsersController(IUserService userService, IImpersonationService impersonationService)
     {
         _userService = userService;
+        _impersonationService = impersonationService;
+    }
+
+    // Returns a short-lived token that is the target user, with an act_by claim naming the caller.
+    // The frontend swaps its session to it and shows a persistent "viewing as" banner; the audit
+    // log gets an Accessed row here and every write during the session is attributed to both.
+    [HttpPost("{id:long}/impersonate")]
+    [Authorize(Policy = Permissions.UsersImpersonate)]
+    [ProducesResponseType(typeof(ApiResponse<ImpersonationResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Impersonate(long id, CancellationToken cancellationToken)
+    {
+        var actor = new ImpersonationActor(
+            GetCurrentUserId(),
+            IsPlatformAdmin: User.HasClaim(c => c.Type == CustomClaims.PlatformAdmin && c.Value == "true"),
+            IsAlreadyImpersonating: User.HasClaim(c => c.Type == CustomClaims.ImpersonatedBy));
+
+        var result = await _impersonationService.ImpersonateAsync(id, actor, cancellationToken);
+        return Ok(ApiResponse<ImpersonationResultDto>.SuccessResponse(result, "Impersonation session started"));
     }
 
     [HttpGet]

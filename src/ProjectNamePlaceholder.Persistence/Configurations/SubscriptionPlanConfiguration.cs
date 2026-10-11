@@ -17,6 +17,19 @@ public sealed class SubscriptionPlanConfiguration : IEntityTypeConfiguration<Sub
         builder.Property(x => x.MaxUsers).IsRequired();
         builder.Property(x => x.IsActive).HasDefaultValue(true);
 
+        // Explicit precision: without it EF maps decimal to the provider default, which silently
+        // truncates on SQL Server. 18,2 covers any realistic subscription price.
+        builder.Property(x => x.Price).HasPrecision(18, 2);
+        builder.Property(x => x.Currency).HasMaxLength(3).IsRequired();
+        builder.Property(x => x.BillingInterval).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(x => x.ExternalPriceId).HasMaxLength(200);
+
+        // Looked up when a webhook names a provider price. No explicit filter: Postgres treats NULLs
+        // as distinct in a unique index, and the SQL Server provider adds "IS NOT NULL" itself, so
+        // the many plans without a provider price never collide on either. (HasFilter(null) would
+        // REMOVE SQL Server's filter and make a second unpriced plan fail to insert.)
+        builder.HasIndex(x => x.ExternalPriceId).IsUnique();
+
         builder.HasIndex(x => x.Key).IsUnique();
     }
 }

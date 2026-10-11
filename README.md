@@ -193,19 +193,19 @@ The implementation covers the RBAC/tenant-isolation core, multi-tenancy, auth, a
 
 ### Platform foundation
 
-1. **Schema-per-tenant or database-per-tenant isolation tier** — currently row-level isolation only (`TenantId` + EF global query filters). A compliance-sensitive customer may require logical/physical per-tenant schemas/databases; investigated and deferred (needs EF `IModelCacheKeyFactory` rework + threading a schema name through ~10 `ICurrentTenantService`/`BeginScope` call sites). Scoped as its own initiative, not attempted opportunistically.
+1. **Schema-per-tenant or database-per-tenant isolation tier** — currently row-level isolation only (`TenantId` + EF global query filters). A compliance-sensitive customer may require logical/physical per-tenant schemas/databases; investigated and deferred (needs EF `IModelCacheKeyFactory` rework + threading a schema name through ~10 `ICurrentTenantService`/`BeginScope` call sites). Scoped as its own initiative, not attempted opportunistically. Design and work items: `src/Docs/SCHEMA_PER_TENANT.md`.
 
-2. **Physical module folder restructure** — move `Core` and `Platform` into separate projects (`Modules/Core/*`, `Modules/Platform/*`) to enforce module boundaries at compile time. Attempted once, reverted because of a circular dependency (`TenantService` ↔ `User`/`Role`), now resolved by the Integration Hub (event-driven decoupling). Worth reattempting; ~160-file undertaking.
+2. **Physical module folder restructure** — move `Core` and `Platform` into separate projects (`Modules/Core/*`, `Modules/Platform/*`) to enforce module boundaries at compile time. Attempted once, reverted because of a circular dependency (`TenantService` ↔ `User`/`Role`), now resolved by the Integration Hub (event-driven decoupling). Worth reattempting; ~160-file undertaking. **The persistence half of the boundary is done** — `[OwnedByModule]`, `IModuleModelContributor`, schema-per-module and the core→module FK ban are enforced at model build (see `src/Docs/MODULE_PERSISTENCE.md`); the split is now a file move onto that seam.
 
 3. **`Olympus.Abstractions` / `Olympus.Sdk` as standalone NuGet packages** — not started; requires the module restructure above first to eliminate hard project-reference coupling.
 
-4. **CI pipeline with multi-parameter smoke-test matrix** — three template parameters (`--cache`, `--database`, `--messagebroker`) create an 8-cell matrix. No `.github/workflows` or CI pipeline exists yet; design and build once a CI infrastructure is chosen.
+4. ~~**CI pipeline with multi-parameter smoke-test matrix**~~ — done: `.github/workflows/ci.yml` builds and tests the template source, checks both providers' migrations are in sync, then generates/builds/tests all 8 `--database` × `--cache` × `--messagebroker` cells.
 
 ### Product-scale concerns
 
 5. **Storage/usage quotas per tenant** — currently only seat quotas (`SubscriptionPlan.MaxUsers`) exist. A full storage quota requires a file/blob storage subsystem to meter against; deferred until such a module is built.
 
-6. **Cross-tenant impersonation/tenant-switcher UI for platform admins** — platform admins can manage tenants but have no UI to browse or act *as* another tenant (only their own tenant + global platform admin endpoints). Doable via `X-Tenant-Id` header support, which already exists server-side; needs FE UI.
+6. ~~**Cross-tenant impersonation/tenant-switcher UI for platform admins**~~ — done: header tenant switcher + "acting as" banner in the frontend, on top of the existing `X-Tenant-Id` override and `Accessed` audit rows.
 
 7. **Invite + admin-approval signup flow** — self-serve signup is actually invite-link + approval-required (`TenantRegistrationController`), not fully open registration. Docs/UX clarity issue, not a build gap — current flow is intentionally controlled.
 

@@ -45,19 +45,29 @@ public sealed class CoreModule : IOlympusModule
         new(Application.Security.Permissions.SiteSettingsDelete, "Delete site settings"),
         new(Application.Security.Permissions.FeatureFlagsRead, "View feature flags"),
         new(Application.Security.Permissions.FeatureFlagsManage, "Manage feature flags"),
+        new(Application.Security.Permissions.AuditLogsReadOwn, "View this tenant's audit logs"),
+        new(Application.Security.Permissions.BillingManage, "Manage this tenant's subscription and billing"),
+        new(Application.Security.Permissions.TranslationsManage, "Manage UI translations"),
+        new(Application.Security.Permissions.UsersImpersonate, "Sign in as another user of this tenant (support)"),
     ];
 
     public IReadOnlyList<MenuDefinition> Menus =>
     [
         new("Dashboard", "/dashboard", "dashboard", null, null),
+        new("IAM", null, "shield", null, null),
+        new("Users", "/users", "users", Application.Security.Permissions.UsersRead, "IAM"),
+        new("Roles", "/roles", "roles", Application.Security.Permissions.RolesRead, "IAM"),
+        new("Permissions", "/permissions", "permissions", Application.Security.Permissions.PermissionsRead, "IAM"),
+        new("User Roles", "/users/roles", "user-roles", Application.Security.Permissions.UserRolesRead, "IAM"),
+        new("Role Permissions", "/roles/permissions", "role-permissions", Application.Security.Permissions.RolePermissionsRead, "IAM"),
         new("Configuration", null, "settings", null, null),
-        new("Users", "/users", "users", Application.Security.Permissions.UsersRead, "Configuration"),
-        new("Roles", "/roles", "roles", Application.Security.Permissions.RolesRead, "Configuration"),
-        new("Permissions", "/permissions", "permissions", Application.Security.Permissions.PermissionsRead, "Configuration"),
-        new("User Roles", "/users/roles", "user-roles", Application.Security.Permissions.UserRolesRead, "Configuration"),
-        new("Role Permissions", "/roles/permissions", "role-permissions", Application.Security.Permissions.RolePermissionsRead, "Configuration"),
-        new("Reports", "/reports", "chart-bar", Application.Security.Permissions.ReportsRead, "Configuration"),
+        new("Menus", "/menu-management", "menu", Application.Security.Permissions.MenusRead, "Configuration"),
         new("Site Settings", "/site-settings", "settings", Application.Security.Permissions.SiteSettingsRead, "Configuration"),
         new("Feature Flags", "/feature-flags", "flag", Application.Security.Permissions.FeatureFlagsRead, "Configuration"),
+        new("Translations", "/translations", "languages", Application.Security.Permissions.TranslationsManage, "Configuration"),
+        new("Billing", "/billing", "receipt", Application.Security.Permissions.BillingManage, "Configuration"),
+        new("Monitoring", null, "activity", null, null),
+        new("Reports", "/reports", "chart-bar", Application.Security.Permissions.ReportsRead, "Monitoring"),
+        new("Audit Logs", "/audit-logs", "History", Application.Security.Permissions.AuditLogsReadOwn, "Monitoring"),
     ];
 }

@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Localization;
 using System.Text;
 using System.Threading.RateLimiting;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -10,7 +12,9 @@ using ProjectNamePlaceholder.Api.Authorization;
 using ProjectNamePlaceholder.Api.Common;
 using ProjectNamePlaceholder.Api.Middleware;
 using ProjectNamePlaceholder.Application;
+using ProjectNamePlaceholder.Application.Billing;
 using ProjectNamePlaceholder.Application.Common.Configuration;
+using ProjectNamePlaceholder.Application.Common.Interfaces;
 using ProjectNamePlaceholder.Application.Security;
 using ProjectNamePlaceholder.Infrastructure;
 using ProjectNamePlaceholder.Infrastructure.Authentication;
@@ -20,6 +24,19 @@ using ProjectNamePlaceholder.Persistence.Seeding;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Mirrors the same tolerance GetProvider() already applies to Database:Provider. In a generated
+// solution these are real booleans substituted by the `cache`/`messagebroker` template parameters;
+// running the raw, un-generated template repo directly they are still the literal placeholder text,
+// which is not convertible to bool and would throw on the first IOptions<CachingOptions> resolve.
+// Both placeholders mean "feature not selected", so normalise them to false.
+foreach (var placeholderKey in new[] { "Caching:UseRedis", "Integration:UseRabbitMq" })
+{
+    if (!bool.TryParse(builder.Configuration[placeholderKey], out _))
+    {
+        builder.Configuration[placeholderKey] = "false";
+    }
+}
 
 // Auto-generate and trust development certificate for HTTPS
 if (builder.Environment.IsDevelopment())
@@ -63,7 +80,28 @@ builder.Services.AddApiVersioning(options =>
     options.SubstituteApiVersionInUrl = true;
 });
 
-// Add CORS
+// Resolved and validated OUT HERE, not inside the AddCors callback below: that callback is an
+// Action<CorsOptions> registered via Configure<>, so it does not run at startup -- it runs lazily
+// the first time the CORS middleware resolves IOptions<CorsOptions>, i.e. on the first request.
+// A guard inside it would not fail the build-up, which is the entire point of validating.
+string[] corsAllowedOrigins = Array.Empty<string>();
+if (!builder.Environment.IsDevelopment())
+{
+    // Previously this fell back to a hard-coded "https://yourdomain.com" -- a domain this project
+    // does not own, combined with AllowCredentials(). Refuse to start instead: a misconfigured CORS
+    // origin either silently breaks the real frontend or trusts somebody else's domain.
+    corsAllowedOrigins = (builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>())
+        .Where(origin => !string.IsNullOrWhiteSpace(origin))
+        .ToArray();
+
+    if (corsAllowedOrigins.Length == 0)
+    {
+        throw new InvalidOperationException(
+            "Cors:AllowedOrigins must list at least one origin outside Development. " +
+            "Set it in appsettings.{Environment}.json, or supply Cors__AllowedOrigins__0.");
+    }
+}
+
 builder.Services.AddCors(options =>
 {
     if (builder.Environment.IsDevelopment())
@@ -80,14 +118,11 @@ builder.Services.AddCors(options =>
     }
     else
     {
-        // Production: Restrict to specific origins
-        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins")?.Get<string[]>() 
-            ?? new[] { "https://yourdomain.com" };
-
+        // Already validated non-empty above, before the container was built.
         options.AddPolicy("AllowFrontend", policy =>
         {
             policy
-                .WithOrigins(allowedOrigins)
+                .WithOrigins(corsAllowedOrigins)
                 .AllowAnyMethod()
                 .AllowAnyHeader()
                 .AllowCredentials();
@@ -144,8 +179,105 @@ builder.Services.Configure<ProjectNamePlaceholder.Application.Common.Configurati
 
 // Tenancy: BaseDomain enables subdomain-based tenant resolution (e.g. acme.olympus.app -> slug "acme")
 builder.Services.Configure<TenancyOptions>(builder.Configuration.GetSection("Tenancy"));
+
+// Behind a reverse proxy / ingress the socket peer is the proxy, not the caller. Two things in
+// this app depend on getting the real values: the rate limiter partitions anonymous traffic by
+// RemoteIpAddress (without this every anonymous caller shares one bucket), and tenant resolution
+// falls back to Request.Host for custom-domain/subdomain routing. Proxies are read from
+// Proxy:KnownProxies / Proxy:KnownNetworks -- when BOTH are empty the forwarded headers are
+// trusted from any peer, which is only safe when the app is not directly reachable from the
+// internet, so it is opt-in via Proxy:TrustAllProxies.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+    options.KnownProxies.Clear();
+    options.KnownNetworks.Clear();
+
+    foreach (var proxy in builder.Configuration.GetSection("Proxy:KnownProxies").Get<string[]>() ?? Array.Empty<string>())
+    {
+        if (System.Net.IPAddress.TryParse(proxy, out var address))
+        {
+            options.KnownProxies.Add(address);
+        }
+    }
+
+    foreach (var network in builder.Configuration.GetSection("Proxy:KnownNetworks").Get<string[]>() ?? Array.Empty<string>())
+    {
+        var parts = network.Split('/');
+        if (parts.Length == 2 && System.Net.IPAddress.TryParse(parts[0], out var prefix) && int.TryParse(parts[1], out var length))
+        {
+            options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(prefix, length));
+        }
+    }
+});
 builder.Services.Configure<ProjectNamePlaceholder.Application.Common.Configuration.TenantOffboardingOptions>(builder.Configuration.GetSection("TenantOffboarding"));
+builder.Services.Configure<AuditLogOptions>(builder.Configuration.GetSection("AuditLog"));
+builder.Services.Configure<FileStorageOptions>(builder.Configuration.GetSection("FileStorage"));
+builder.Services.AddScoped<IFileStorage, ProjectNamePlaceholder.Infrastructure.Storage.LocalFileStorage>();
+builder.Services.AddHostedService<ProjectNamePlaceholder.Api.Startup.AuditLogRetentionWorker>();
 builder.Services.Configure<ProjectNamePlaceholder.Application.Common.Configuration.LicensingOptions>(builder.Configuration.GetSection("Licensing"));
+
+builder.Services.Configure<PaymentOptions>(builder.Configuration.GetSection("Payment"));
+
+// Request culture: tenant's UI.Locale site setting first, then Accept-Language, clamped to the
+// configured supported list. Message strings stay English; this is about formatting, parsing and
+// FluentValidation's built-in messages agreeing with the frontend's locale.
+var localizationOptions = builder.Configuration.GetSection("Localization").Get<ProjectNamePlaceholder.Application.Common.Configuration.LocalizationOptions>()
+    ?? new ProjectNamePlaceholder.Application.Common.Configuration.LocalizationOptions();
+builder.Services.AddLocalization();
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    var supported = localizationOptions.SupportedCultures
+        .Where(c => !string.IsNullOrWhiteSpace(c))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+    if (supported.Length == 0)
+    {
+        supported = [localizationOptions.DefaultCulture];
+    }
+
+    options.SetDefaultCulture(localizationOptions.DefaultCulture)
+        .AddSupportedCultures(supported)
+        .AddSupportedUICultures(supported);
+
+    // en-GB requested but only en-US supported still lands on English rather than the default.
+    options.FallBackToParentCultures = true;
+    options.FallBackToParentUICultures = true;
+    options.ApplyCurrentCultureToResponseHeaders = true;
+
+    options.RequestCultureProviders =
+    [
+        new QueryStringRequestCultureProvider(),
+        new ProjectNamePlaceholder.Api.Middleware.TenantLocaleRequestCultureProvider(),
+        new AcceptLanguageHeaderRequestCultureProvider(),
+    ];
+});
+
+// Fail fast rather than at the first webhook: an enabled gateway with no signing secret would
+// accept unverified traffic that can extend a tenant's licence indefinitely.
+var paymentOptions = builder.Configuration.GetSection("Payment").Get<PaymentOptions>() ?? new PaymentOptions();
+if (paymentOptions.Enabled && string.IsNullOrWhiteSpace(paymentOptions.WebhookSecret))
+{
+    throw new InvalidOperationException(
+        "Payment:Enabled is true but Payment:WebhookSecret is not set. Billing webhooks cannot be verified without it.");
+}
+
+// Provider-agnostic by design: register the IPaymentGateway matching Payment:Provider here when a
+// provider is chosen. "manual" is a real mode -- licences are managed by a platform admin through
+// the existing tenant licence endpoints.
+builder.Services.AddScoped<IBillingEventProcessor, BillingEventProcessor>();
+switch (paymentOptions.Provider?.Trim().ToLowerInvariant())
+{
+    // case "stripe": builder.Services.AddScoped<IPaymentGateway, StripePaymentGateway>(); break;
+    // case "paddle": builder.Services.AddScoped<IPaymentGateway, PaddlePaymentGateway>(); break;
+    case "manual":
+    case null:
+    case "":
+        builder.Services.AddScoped<IPaymentGateway, ManualPaymentGateway>();
+        break;
+    default:
+        throw new InvalidOperationException($"Unknown Payment:Provider '{paymentOptions.Provider}'.");
+}
 
 // Caching: bind options and register distributed cache (Redis if configured)
 var cachingSection = builder.Configuration.GetSection("Caching");
@@ -171,7 +303,22 @@ builder.Services.AddSingleton<ProjectNamePlaceholder.Api.Startup.CacheKeyRegistr
 builder.Services.AddScoped<ProjectNamePlaceholder.Api.Startup.DistributedCacheAdminService>();
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
-var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecretKey));
+
+// Validated here rather than left to SymmetricSecurityKey: an empty secret throws an opaque
+// ArgumentException, and a merely SHORT one is worse -- it constructs fine and only fails later,
+// at the first token signing. HS256 requires a key of at least 256 bits.
+const int minimumSecretKeyBytes = 32;
+var secretKeyBytes = Encoding.UTF8.GetBytes(jwtOptions.SecretKey ?? string.Empty);
+
+if (secretKeyBytes.Length < minimumSecretKeyBytes)
+{
+    throw new InvalidOperationException(
+        $"Jwt:SecretKey must be at least {minimumSecretKeyBytes} bytes (256 bits) for HS256; " +
+        $"got {secretKeyBytes.Length}. Set it in appsettings.json, or supply the Jwt__SecretKey " +
+        "environment variable.");
+}
+
+var key = new SymmetricSecurityKey(secretKeyBytes);
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -229,13 +376,34 @@ builder.Services.AddRateLimiter(options =>
     {
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
         {
-            var partitionKey = context.User.FindFirst("tenant_id")?.Value
-                ?? context.Connection.RemoteIpAddress?.ToString()
-                ?? "unknown";
+            var tenantId = context.User.FindFirst(CustomClaims.TenantId)?.Value;
 
-            return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+            if (string.IsNullOrEmpty(tenantId))
             {
-                PermitLimit = rateLimitingOptions.PermitLimit,
+                // Anonymous: per-IP, tighter. Requires Proxy:KnownNetworks behind a load balancer or
+                // every caller collapses into one bucket (see HOW-TO-USE §12).
+                var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                return RateLimitPartition.GetFixedWindowLimiter($"ip:{ip}", _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = rateLimitingOptions.AnonymousPermitLimit,
+                    Window = TimeSpan.FromSeconds(rateLimitingOptions.AnonymousWindowSeconds),
+                    QueueLimit = rateLimitingOptions.QueueLimit,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                });
+            }
+
+            // Per tenant, sized by the plan's budget carried in the token (no DB read here). The
+            // budget is part of the partition key on purpose: limiters are cached per key, so a plan
+            // change takes effect as soon as tokens carrying the new value appear, rather than being
+            // stuck with the options the first request created the limiter with.
+            var planClaim = context.User.FindFirst(CustomClaims.PlanRequestsPerMinute)?.Value;
+            var permit = int.TryParse(planClaim, out var planRpm) && planRpm > 0
+                ? planRpm
+                : rateLimitingOptions.PermitLimit;
+
+            return RateLimitPartition.GetFixedWindowLimiter($"tenant:{tenantId}:{permit}", _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = permit,
                 Window = TimeSpan.FromSeconds(rateLimitingOptions.WindowSeconds),
                 QueueLimit = rateLimitingOptions.QueueLimit,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
@@ -271,8 +439,38 @@ builder.Services.AddScoped<ProjectNamePlaceholder.Api.Startup.PermissionSyncServ
 
 var app = builder.Build();
 
+// Must run before anything that reads the caller's IP, scheme or host -- it rewrites those from
+// the X-Forwarded-* headers the proxy set. TrustAllProxies is required to accept them from an
+// unlisted peer (see the ForwardedHeadersOptions registration above).
+var trustAllProxies = builder.Configuration.GetValue<bool>("Proxy:TrustAllProxies");
+var hasKnownProxies = (builder.Configuration.GetSection("Proxy:KnownProxies").Get<string[]>()?.Length ?? 0) > 0
+    || (builder.Configuration.GetSection("Proxy:KnownNetworks").Get<string[]>()?.Length ?? 0) > 0;
+
+if (trustAllProxies || hasKnownProxies)
+{
+    app.UseForwardedHeaders();
+}
+
 app.UseExceptionHandler();
-app.UseSerilogRequestLogging();
+
+// Bare status codes (a 404 from an unmatched route, the rate limiter's 429) return an empty body
+// otherwise, while everything else in the API answers with ProblemDetails.
+app.UseStatusCodePages();
+
+app.UseRequestId();
+app.UseSerilogRequestLogging(options =>
+{
+    // Runs at the end of the request, by which point TenantResolutionMiddleware has resolved the
+    // tenant -- so the completion log line for every request carries the tenant it belonged to.
+    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+    {
+        var tenant = httpContext.RequestServices.GetService<ICurrentTenantService>();
+        if (tenant?.TenantSlug is { } slug)
+        {
+            diagnosticContext.Set("TenantSlug", slug);
+        }
+    };
+});
 app.UseRouting();
 
 // CORS must be placed before authentication/authorization middleware
@@ -289,10 +487,23 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+// Placed after the Swagger branch so it does not apply to Swagger UI's own HTML/JS, which the
+// strict default-src would otherwise block. Swagger is development-only anyway.
+app.UseSecurityHeaders();
+
+if (!app.Environment.IsDevelopment())
+{
+    // Not enabled in development: an HSTS pin on localhost outlives the debugging session and
+    // breaks any other local http:// project on the same host.
+    app.UseHsts();
+}
+
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseRateLimiter();
 app.UseTenantResolution();
+// After tenant resolution on purpose: the tenant-locale provider needs the ambient tenant.
+app.UseRequestLocalization();
 app.UseTokenValidation();
 app.UseAuthorization();
 

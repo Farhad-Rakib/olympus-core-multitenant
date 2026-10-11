@@ -1,3 +1,4 @@
+using ProjectNamePlaceholder.Application.Billing;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Options;
 using ProjectNamePlaceholder.Application.Common.Configuration;
@@ -32,7 +33,9 @@ public sealed class TenantService : ITenantService
     private readonly ITenantOffboardingService _tenantOffboardingService;
     private readonly TenantOffboardingOptions _offboardingOptions;
     private readonly ILicenseService _licenseService;
+    private readonly IProcessedBillingEventRepository _processedBillingEventRepository;
     private readonly IEventBus _eventBus;
+    private readonly IUserRepository _userRepository;
 
     public TenantService(
         IRepository<Tenant> tenantRepository,
@@ -49,7 +52,9 @@ public sealed class TenantService : ITenantService
         ITenantOffboardingService tenantOffboardingService,
         IOptions<TenantOffboardingOptions> offboardingOptions,
         ILicenseService licenseService,
-        IEventBus eventBus)
+        IProcessedBillingEventRepository processedBillingEventRepository,
+        IEventBus eventBus,
+        IUserRepository userRepository)
     {
         _tenantRepository = tenantRepository;
         _moduleRepository = moduleRepository;
@@ -65,19 +70,26 @@ public sealed class TenantService : ITenantService
         _tenantOffboardingService = tenantOffboardingService;
         _offboardingOptions = offboardingOptions.Value;
         _licenseService = licenseService;
+        _processedBillingEventRepository = processedBillingEventRepository;
         _eventBus = eventBus;
+        _userRepository = userRepository;
     }
 
     public async Task<IReadOnlyList<TenantDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var tenants = await _tenantRepository.GetAllAsync(cancellationToken);
-        return tenants.Select(MapTenant).ToList();
+        var lastPayments = await _processedBillingEventRepository.GetLatestByTypeAsync(
+            nameof(BillingEventType.SubscriptionRenewed), cancellationToken);
+        return tenants.Select(t => MapTenant(t, lastPayments)).ToList();
     }
 
     public async Task<TenantDto?> GetByIdAsync(long id, CancellationToken cancellationToken = default)
     {
         var tenant = await _tenantRepository.GetByIdAsync(id, cancellationToken);
-        return tenant is null ? null : MapTenant(tenant);
+        if (tenant is null) return null;
+        var lastPayments = await _processedBillingEventRepository.GetLatestByTypeAsync(
+            nameof(BillingEventType.SubscriptionRenewed), cancellationToken);
+        return MapTenant(tenant, lastPayments);
     }
 
     public async Task<TenantDto> CreateAsync(CreateTenantRequestDto request, CancellationToken cancellationToken = default)
@@ -496,6 +508,52 @@ public sealed class TenantService : ITenantService
         await _tenantOffboardingService.PurgeAsync(tenant, cancellationToken);
     }
 
+    public async Task<TenantOverviewDto> GetOverviewAsync(long tenantId, CancellationToken cancellationToken = default)
+    {
+        var tenant = await _tenantRepository.GetByIdAsync(tenantId, cancellationToken)
+            ?? throw new AppException("Tenant not found.", 404);
+
+        using var scope = _currentTenantService.BeginScope(tenant.Id, tenant.Slug);
+
+        TenantPlanDto? plan = null;
+        var planModuleIds = new HashSet<long>();
+        if (tenant.SubscriptionPlanId is { } planId)
+        {
+            var subscriptionPlan = await _subscriptionPlanRepository.GetByIdAsync(planId, cancellationToken);
+            if (subscriptionPlan is not null)
+            {
+                plan = new TenantPlanDto(subscriptionPlan.Key, subscriptionPlan.Name, subscriptionPlan.Description, subscriptionPlan.MaxUsers, subscriptionPlan.Price, subscriptionPlan.Currency, subscriptionPlan.BillingInterval);
+                planModuleIds = (await _subscriptionPlanModuleRepository.GetModuleIdsForPlanAsync(planId, cancellationToken)).ToHashSet();
+            }
+        }
+
+        var allModules = await _moduleRepository.GetAllAsync(cancellationToken);
+        var entitledModuleIds = (await _tenantModuleRepository.GetEntitledModuleIdsAsync(cancellationToken)).ToHashSet();
+
+        // Union of "sold in the plan" and "currently entitled": a module can be granted outside the
+        // plan, and one the plan includes can be switched off. Showing both, flagged, is what makes
+        // this answer "what did we buy, and what is actually on right now".
+        var modules = allModules
+            .Where(module => module.Kind != ModuleKind.System)
+            .Where(module => planModuleIds.Contains(module.Id) || entitledModuleIds.Contains(module.Id))
+            .OrderBy(module => module.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(module => new TenantModuleSummaryDto(module.Key, module.Name, module.Description, entitledModuleIds.Contains(module.Id)))
+            .ToList();
+
+        var userCount = await _userRepository.CountByTenantAsync(cancellationToken);
+        var licenseStatus = _licenseService.ComputeStatus(tenant);
+
+        return new TenantOverviewDto(
+            tenant.Name,
+            tenant.Slug,
+            plan,
+            licenseStatus,
+            tenant.TrialEndsAtUtc,
+            tenant.LicenseExpiresAtUtc,
+            userCount,
+            modules);
+    }
+
     public Task<LicenseStatus> GetLicenseStatusAsync(long tenantId, CancellationToken cancellationToken = default) =>
         _licenseService.GetStatusAsync(tenantId, cancellationToken);
 
@@ -539,6 +597,19 @@ public sealed class TenantService : ITenantService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
-    private static TenantDto MapTenant(Tenant tenant) =>
-        new(tenant.Id, tenant.Slug, tenant.Name, tenant.IsActive, tenant.SubscriptionPlanId, tenant.IsProvisioned);
+    private TenantDto MapTenant(Tenant tenant) => MapTenant(tenant, null);
+
+    private TenantDto MapTenant(Tenant tenant, IReadOnlyDictionary<long, DateTime>? lastPayments) =>
+        new(
+            tenant.Id,
+            tenant.Slug,
+            tenant.Name,
+            tenant.IsActive,
+            tenant.SubscriptionPlanId,
+            tenant.IsProvisioned,
+            _licenseService.ComputeStatus(tenant),
+            tenant.TrialEndsAtUtc,
+            tenant.LicenseExpiresAtUtc,
+            tenant.IsSuspended,
+            lastPayments is not null && lastPayments.TryGetValue(tenant.Id, out var paidAt) ? paidAt : null);
 }

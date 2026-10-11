@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ProjectNamePlaceholder.Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using ProjectNamePlaceholder.Persistence.Context;
+using ProjectNamePlaceholder.Persistence.ModulePersistence;
 using ProjectNamePlaceholder.Persistence.Repositories;
 using ProjectNamePlaceholder.Persistence.Seeding;
 using ProjectNamePlaceholder.Application.Menu;
@@ -11,8 +12,14 @@ namespace ProjectNamePlaceholder.Persistence;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddPersistence(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddPersistence(this IServiceCollection services, IConfiguration configuration, Action<ModulePersistenceOptions>? configureModules = null)
     {
+        // Singleton: EF builds the model once per app lifetime, so the assembly list must be fixed
+        // before the first DbContext is constructed and identical for every instance.
+        var modulePersistence = new ModulePersistenceOptions();
+        configureModules?.Invoke(modulePersistence);
+        services.AddSingleton(modulePersistence);
+
         services.AddDbContext<ApplicationDbContext>(options =>
         {
             var provider = GetProvider(configuration);
@@ -30,12 +37,15 @@ public static class DependencyInjection
             //#endif
         });
 
+        services.AddScoped<IAuditLogRetentionService, ProjectNamePlaceholder.Persistence.Maintenance.AuditLogRetentionService>();
+        services.AddScoped<IProcessedBillingEventRepository, ProcessedBillingEventRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepository>();
         services.AddScoped<ISiteSettingRepository, SiteSettingRepository>();
+        services.AddScoped<ITranslationRepository, TranslationRepository>();
         services.AddScoped<ITenantFeatureFlagRepository, TenantFeatureFlagRepository>();
         services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
@@ -80,10 +90,24 @@ public static class DependencyInjection
         return provider is "postgres" or "sqlserver" ? provider : "postgres";
     }
 
+    // Treats blank as missing, not just null: the environment-specific appsettings files ship these
+    // keys empty on purpose (the real value comes from an environment variable), and an empty string
+    // would otherwise sail past a null check and surface as an opaque provider-level parse error.
     private static string GetConnectionString(IConfiguration configuration, string key)
     {
-        return configuration.GetConnectionString(key)
-            ?? configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException($"Missing connection string: {key}.");
+        var connectionString = configuration.GetConnectionString(key);
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            connectionString = configuration.GetConnectionString("DefaultConnection");
+        }
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException(
+                $"Missing connection string: {key}. Set it in appsettings.json, or supply the " +
+                $"ConnectionStrings__{key} environment variable.");
+        }
+
+        return connectionString;
     }
 }

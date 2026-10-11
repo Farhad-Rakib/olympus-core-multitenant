@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using ProjectNamePlaceholder.Application.Common.Configuration;
 using ProjectNamePlaceholder.Application.Common.Interfaces;
 using ProjectNamePlaceholder.Application.Tenants.Dtos;
 using ProjectNamePlaceholder.Domain.Entities;
@@ -8,13 +10,25 @@ namespace ProjectNamePlaceholder.Persistence.Offboarding;
 
 public sealed class TenantOffboardingService : ITenantOffboardingService
 {
+    // Written into Changes in place of the original payload, so an anonymised row is visibly
+    // redacted rather than looking like an event that genuinely had no data.
+    private const string RedactedChangesMarker = "{\"redacted\":\"tenant purged\"}";
+
     private readonly ApplicationDbContext _dbContext;
     private readonly ICurrentTenantService _currentTenantService;
+    private readonly IFileStorage _fileStorage;
+    private readonly TenantOffboardingOptions _options;
 
-    public TenantOffboardingService(ApplicationDbContext dbContext, ICurrentTenantService currentTenantService)
+    public TenantOffboardingService(
+        ApplicationDbContext dbContext,
+        ICurrentTenantService currentTenantService,
+        IFileStorage fileStorage,
+        IOptions<TenantOffboardingOptions> options)
     {
         _dbContext = dbContext;
         _currentTenantService = currentTenantService;
+        _fileStorage = fileStorage;
+        _options = options.Value;
     }
 
     public async Task<TenantExportDto> ExportAsync(Tenant tenant, CancellationToken cancellationToken = default)
@@ -98,8 +112,55 @@ public sealed class TenantOffboardingService : ITenantOffboardingService
         _dbContext.TenantDomains.RemoveRange(
             await _dbContext.TenantDomains.Where(d => d.TenantId == tenant.Id).ToListAsync(cancellationToken));
 
+        // AuditLog is the third non-ITenantEntity in this method and needs the same explicit
+        // TenantId filter as the two above. Unlike them it is not simply deleted: see
+        // PurgedTenantAuditHandling for why this is a configured choice. Handled BEFORE the tenant
+        // row goes, while tenant.Id is still meaningful.
+        await ApplyAuditHandlingAsync(tenant.Id, cancellationToken);
+
         _dbContext.Remove(tenant);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Deliberately AFTER the commit. The database purge is atomic; file deletion is not, and it
+        // cannot be rolled back. Deleting files first would mean a failed commit leaves the tenant
+        // intact but its uploads already destroyed. This ordering fails the safer way: the worst
+        // case is orphaned files on disk, which can be swept up later.
+        if (_options.FileHandling == PurgedTenantFileHandling.Delete)
+        {
+            await _fileStorage.DeleteAllForTenantAsync(tenant.Id, cancellationToken);
+        }
+    }
+
+    private async Task ApplyAuditHandlingAsync(long tenantId, CancellationToken cancellationToken)
+    {
+        if (_options.AuditHandling == PurgedTenantAuditHandling.Retain)
+        {
+            return;
+        }
+
+        var auditLogs = await _dbContext.AuditLogs
+            .Where(log => log.TenantId == tenantId)
+            .ToListAsync(cancellationToken);
+
+        if (auditLogs.Count == 0)
+        {
+            return;
+        }
+
+        if (_options.AuditHandling == PurgedTenantAuditHandling.Delete)
+        {
+            _dbContext.AuditLogs.RemoveRange(auditLogs);
+            return;
+        }
+
+        foreach (var log in auditLogs)
+        {
+            // TenantId is deliberately kept: it is an opaque identifier that no longer resolves to
+            // anything once the tenant row is gone, and keeping it lets the trail still be grouped
+            // by the tenant it belonged to. UserId and Changes are the parts that identify people.
+            log.UserId = null;
+            log.Changes = RedactedChangesMarker;
+        }
     }
 }

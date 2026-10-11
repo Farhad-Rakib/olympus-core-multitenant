@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using ProjectNamePlaceholder.Application.Common.Interfaces.Security;
+using ProjectNamePlaceholder.Application.Security;
 using ProjectNamePlaceholder.Domain.Entities;
 
 namespace ProjectNamePlaceholder.Infrastructure.Authentication;
@@ -17,7 +18,7 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
         _jwtOptions = jwtOptions.Value;
     }
 
-    public string GenerateAccessToken(User user, IEnumerable<string> permissions)
+    public string GenerateAccessToken(User user, IEnumerable<string> permissions, AccessTokenOptions? options = null)
     {
         var claims = new List<Claim>
         {
@@ -43,9 +44,19 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
             claims.Add(new Claim("platform_admin", "true"));
         }
 
+        if (options?.RequestsPerMinute is > 0)
+        {
+            claims.Add(new Claim(CustomClaims.PlanRequestsPerMinute, options.RequestsPerMinute.Value.ToString()));
+        }
+
+        if (options?.ImpersonatorUserId is { } actorId)
+        {
+            claims.Add(new Claim(CustomClaims.ImpersonatedBy, actorId.ToString()));
+        }
+
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.SecretKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-        var expiresAt = DateTime.UtcNow.AddMinutes(_jwtOptions.ExpiryMinutes);
+        var expiresAt = GetAccessTokenExpiryUtc(options?.LifetimeMinutes);
 
         var tokenDescriptor = new JwtSecurityToken(
             _jwtOptions.Issuer,
@@ -57,8 +68,8 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
         return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
     }
 
-    public DateTime GetAccessTokenExpiryUtc()
+    public DateTime GetAccessTokenExpiryUtc(int? lifetimeMinutes = null)
     {
-        return DateTime.UtcNow.AddMinutes(_jwtOptions.ExpiryMinutes);
+        return DateTime.UtcNow.AddMinutes(lifetimeMinutes is > 0 ? lifetimeMinutes.Value : _jwtOptions.ExpiryMinutes);
     }
 }

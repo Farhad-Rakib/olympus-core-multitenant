@@ -15,11 +15,22 @@ public sealed class AuditLogRepository : IAuditLogRepository
         _dbContext = dbContext;
     }
 
+    public async Task AddAsync(AuditLog entry, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.AuditLogs.AddAsync(entry, cancellationToken);
+    }
+
     public async Task<(IReadOnlyList<AuditLog> Items, int Total)> GetPagedAsync(AuditLogQuery query, CancellationToken cancellationToken = default)
     {
         var filtered = _dbContext.AuditLogs.AsNoTracking().AsQueryable();
 
-        if (query.TenantId is not null)
+        if (query.EnforcedTenantId is not null)
+        {
+            // Hard tenant pin for non-platform callers -- applied before (and instead of) the
+            // caller-supplied TenantId so a hostile tenantId parameter is simply ignored.
+            filtered = filtered.Where(log => log.TenantId == query.EnforcedTenantId);
+        }
+        else if (query.TenantId is not null)
         {
             filtered = filtered.Where(log => log.TenantId == query.TenantId);
         }

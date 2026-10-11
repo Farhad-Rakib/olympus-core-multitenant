@@ -28,9 +28,19 @@ public sealed class SqlServerAdvisoryBootLock : IDistributedBootLock
 
     public async Task<IAsyncDisposable> AcquireAsync(CancellationToken cancellationToken = default)
     {
-        var connectionString = _configuration.GetConnectionString("SqlServerConnection")
-            ?? _configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException("Missing connection string: SqlServerConnection.");
+        // Blank counts as missing -- see DependencyInjection.GetConnectionString for why.
+        var connectionString = _configuration.GetConnectionString("SqlServerConnection");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            connectionString = _configuration.GetConnectionString("DefaultConnection");
+        }
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException(
+                "Missing connection string: SqlServerConnection. Set it in appsettings.json, or supply the " +
+                "ConnectionStrings__SqlServerConnection environment variable.");
+        }
 
         var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);

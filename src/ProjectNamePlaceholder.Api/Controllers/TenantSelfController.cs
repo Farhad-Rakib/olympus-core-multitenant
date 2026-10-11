@@ -30,6 +30,21 @@ public sealed class TenantSelfController : ControllerBase
         _currentTenantService = currentTenantService;
     }
 
+    // Same [SkipLicenseCheck] rationale as the license endpoint below: this is the tenant's own
+    // dashboard, and it must still render (showing the expiry/plan that explains the lockout) when
+    // the license has lapsed.
+    [HttpGet("overview")]
+    [SkipLicenseCheck]
+    [ProducesResponseType(typeof(ApiResponse<TenantOverviewDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetOverview(CancellationToken cancellationToken)
+    {
+        var tenantId = _currentTenantService.TenantId
+            ?? throw new AppException("No tenant context is available for this request.", 400);
+
+        var overview = await _tenantService.GetOverviewAsync(tenantId, cancellationToken);
+        return Ok(ApiResponse<TenantOverviewDto>.SuccessResponse(overview, "Tenant overview retrieved successfully"));
+    }
+
     // [SkipLicenseCheck]: this is the one endpoint a tenant member must still be able to reach
     // once their own license is Expired/Suspended -- otherwise the very screen that would explain
     // why they're locked out is itself blocked by the 402 it exists to explain.
