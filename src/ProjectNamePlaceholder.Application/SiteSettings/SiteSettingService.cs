@@ -52,7 +52,7 @@ public sealed class SiteSettingService : ISiteSettingService
         {
             var created = new SiteSetting
             {
-                Id =  dto.Id,
+                Id = dto.Id,
                 Key = dto.Key,
                 Value = dto.Value,
                 Description = dto.Description

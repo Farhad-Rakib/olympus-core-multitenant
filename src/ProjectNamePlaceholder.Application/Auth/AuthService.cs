@@ -294,7 +294,7 @@ public sealed class AuthService : IAuthService
     public async Task<ForgotPasswordResponseDto> ForgotPasswordAsync(Dtos.ForgotPasswordRequestDto request, CancellationToken cancellationToken = default)
     {
         var user = await _userRepository.GetByEmailAsync(request.Email, cancellationToken);
-        
+
         if (user is null || !user.IsActive)
         {
             // Don't reveal if user exists (security best practice)
@@ -362,11 +362,11 @@ public sealed class AuthService : IAuthService
         // Update password
         var hashedPassword = _passwordHasher.Hash(request.NewPassword);
         user.UpdatePassword(hashedPassword);
-        
+
         // Mark reset token as used
         resetToken.MarkAsUsed();
         _passwordResetTokenRepository.Update(resetToken);
-        
+
         _userRepository.Update(user);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -384,7 +384,7 @@ public sealed class AuthService : IAuthService
     public async Task ChangePasswordAsync(Dtos.ChangePasswordRequestDto request, CancellationToken cancellationToken = default)
     {
         var user = await _userRepository.GetByIdAsync(request.UserId, cancellationToken);
-        
+
         if (user is null || !user.IsActive)
         {
             throw new AppException("User not found or is inactive.", 404);
@@ -405,7 +405,7 @@ public sealed class AuthService : IAuthService
         // Update password
         var hashedPassword = _passwordHasher.Hash(request.NewPassword);
         user.UpdatePassword(hashedPassword);
-        
+
         _userRepository.Update(user);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
